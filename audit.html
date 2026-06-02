@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Clean Food | ExpertAudit HACCP v3 bis — Boulangerie (94 points)</title>
+<title>Clean Food | ExpertAudit HACCP v3 bis — Boulangerie (101 points + annexe matériel)</title>
 <script>
 // Chargement docx avec chaîne de 4 CDN de secours
 (function() {
@@ -981,7 +981,7 @@ body{background:#fff}
 <div id="appMain" style="display:none">
 
 <div class="topbar">
-  <div class="brand"><span class="dot" style="background:#3b8a77"></span>Clean Food <em style="font-style:normal;color:rgba(255,255,255,.5) !important;font-size:.78rem;margin-left:4px">ExpertAudit HACCP</em><span style="margin-left:8px;background:#d2ad46;color:#201806;font-size:.62rem;font-weight:800;padding:2px 7px;border-radius:999px;letter-spacing:.03em">v3 BIS · BOULANGERIE 94 pts</span></div>
+  <div class="brand"><span class="dot" style="background:#3b8a77"></span>Clean Food <em style="font-style:normal;color:rgba(255,255,255,.5) !important;font-size:.78rem;margin-left:4px">ExpertAudit HACCP</em><span style="margin-left:8px;background:#d2ad46;color:#201806;font-size:.62rem;font-weight:800;padding:2px 7px;border-radius:999px;letter-spacing:.03em">v3 BIS · BOULANGERIE 101 pts</span></div>
   <div class="tbtns" id="topbarBtns">
   </div>
 </div>
@@ -5440,6 +5440,15 @@ const SECTEURS = {
       { l: "Poubelles", w: 2, ref: "Couvercle, propres, vidées régulièrement" },
       { l: "Tri des biodéchets (loi AGEC)", w: 2, ref: "Bac dédié + bordereau de collecte" },
       { l: "Local poubelles", w: 2, ref: "Éloigné des denrées, lavable" }
+    ]},
+    { s: 15, name: "ANNEXE — CONTRÔLE MATÉRIEL DU FOURNIL (7 machines)", items: [
+      { l: "1. Pétrin", w: 3, ref: "Zone : sous la tête, racleur de cuve, grille de sécurité et boutons · Risques : croûtes de pâte ancienne (fermentation/moisissures), écaillage/rouille (corps étrangers) · Docs : PND quotidien émargé, fiche technique lubrifiant grade alimentaire H1" },
+      { l: "2. Refroidisseur d'eau", w: 3, ref: "Zone : cuve tampon, bras de mélange/doseur, tuyauteries de sortie · Risques : stagnation, rupture liaison froide (>10°C), biofilms (Legionella) · Docs : attestation entretien annuel groupe froid, registre détartrage/désinfection cuve (1-2×/an)" },
+      { l: "3. Diviseuse", w: 2, ref: "Zone : talons de coupe (fond de cuve), entre couteaux rétractables, vérin hydraulique · Risques : pâte humide coincée (pourrissement), insectes de la farine, fuite huile hydraulique non alimentaire · Docs : protocole démontage/nettoyage en position maintenance, émargement quotidien, fiche technique huile du vérin" },
+      { l: "4. Reposeuse (balancelle)", w: 2, ref: "Zone : poches/gouttières feutre ou tissu, parois internes, structure métallique basse · Risques : moisissures de stockage (humidité), poussières de farine rance (allergènes) · Docs : planning passage four ou lavage des poches tissu, contrat/rapports désinsectisation" },
+      { l: "5. Façonneuse", w: 2, ref: "Zone : tapis d'enroulement (laine/synthétique), rouleaux lamineurs, tiroir de récupération · Risques : encrassement des fibres (vire au vert/noir), effilochage des tapis (corps étrangers textiles) · Docs : calendrier brossage à sec et remplacement des tapis, certificat conformité alimentaire matériau des rouleaux" },
+      { l: "6. Chambre de pousse", w: 3, ref: "Zone : joints magnétiques des portes, grilles d'injection de buée, bac de rétention/bonde au sol · Risques : milieu chaud et humide (champignons, moisissures, Listeria), eau stagnante au sol (roues chariots) · Docs : enregistrements T° (blocage +4°C, pousse +25 à +28°C), suivi traitement anticalcaire eau humidificateur" },
+      { l: "7. Four à soles", w: 2, ref: "Zone : dalles pierre réfractaire (soles), vitres/poignées des bouches, hotte d'aspiration des buées · Risques : débris carbonisés/suie (HAP), brisure de pierre réfractaire (corps étrangers) · Docs : certificat de ramonage annuel des conduits gaz/buées, fiche de contrôle nettoyage/aspiration hebdomadaire des soles" }
     ]}
   ]
 };
@@ -5551,7 +5560,7 @@ function calcScore() {
   const rows = document.querySelectorAll('.ar');
   let eMax = 0, eScore = 0, cA = 0, cB = 0, cC = 0, cU = 0;
   const sd = {};
-  for(let i=1; i<=14; i++) sd[i] = {s:0, m:0};
+  for(let i=1; i<=20; i++) sd[i] = {s:0, m:0};
   const ncL = [];
 
   rows.forEach(function(r) {
@@ -5585,7 +5594,7 @@ function calcScore() {
   document.getElementById('alerte').classList.toggle('on', pct !== null && pct < 60);
 
   // Badges sections
-  for(let i=1; i<=14; i++){
+  for(let i=1; i<=20; i++){
     const b = document.getElementById('b'+i);
     if (!b) continue;
     if (sd[i].m === 0) { b.textContent = '--'; continue; }
