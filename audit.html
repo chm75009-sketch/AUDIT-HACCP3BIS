@@ -1076,8 +1076,8 @@ body{background:#fff}
   </div>
 
   <!-- OBS -->
-  <div class="obs"><h3>📝 Actions Correctives Requises</h3><textarea id="obs1" placeholder="Décrivez les actions correctives immédiates..."></textarea></div>
-  <div class="obs"><h3>📋 Observations Générales</h3><textarea id="obs2" placeholder="Points positifs, recommandations..."></textarea></div>
+  <div class="obs"><h3>📝 Actions Correctives Requises</h3><textarea id="obs1" placeholder="Décrivez les actions correctives immédiates..." oninput="saveDraftDebounced()"></textarea></div>
+  <div class="obs"><h3>📋 Observations Générales</h3><textarea id="obs2" placeholder="Points positifs, recommandations..." oninput="saveDraftDebounced()"></textarea></div>
 
   <!-- SIGNATURES -->
   <div class="sigs">
@@ -1230,11 +1230,32 @@ body{background:#fff}
 
                 img.src = imgData;
                 img.className = 'photo-inseree';
-                img.style.width = "200px";
+                img.style.width = "100%";
                 img.style.display = "block";
-                img.style.margin = "10px auto";
+                img.style.margin = "0";
                 img.style.border = "2px solid #153e35";
-                cible.appendChild(img);
+                img.style.borderRadius = "6px";
+
+                // Conteneur + bouton de suppression (photo qui ne correspond pas, etc.)
+                var wrap = document.createElement('div');
+                wrap.className = 'photo-wrap';
+                wrap.style.cssText = 'position:relative;width:200px;margin:10px auto';
+                var del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'photo-del';
+                del.textContent = '✕';
+                del.title = 'Supprimer cette photo';
+                del.style.cssText = 'position:absolute;top:-9px;right:-9px;width:28px;height:28px;border-radius:50%;background:#e05252;color:#fff;border:2px solid #fff;font-size:14px;font-weight:700;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.35);z-index:5;padding:0';
+                del.onclick = function(ev) {
+                    ev.stopPropagation();
+                    if (confirm('Supprimer cette photo ?')) {
+                        try { if (img.src && img.src.indexOf('blob:') === 0) URL.revokeObjectURL(img.src); } catch(e){}
+                        wrap.remove();
+                    }
+                };
+                wrap.appendChild(img);
+                wrap.appendChild(del);
+                cible.appendChild(wrap);
             }
         }
     };
@@ -5894,7 +5915,7 @@ function switchSecteur() {
       html += '</select>';
       html += '<button class="nb" onclick="toggleNote(this)">&#9998;</button>';
       html += '</td></tr>';
-      html += '<tr class="nr"><td colspan="2"><textarea placeholder="Detail observation..."></textarea></td></tr>';
+      html += '<tr class="nr"><td colspan="2"><textarea placeholder="Detail observation..." oninput="saveDraftDebounced()"></textarea></td></tr>';
     }
     html += '</tbody></table></div>';
   }
@@ -5908,6 +5929,7 @@ function onChange(sel) {
   if (sel.value === '0' && +sel.closest('.ar').dataset.w === 3) {
     toast('⚠ Alerte Critique — Action corrective immédiate !', 'err');
   }
+  saveDraftDebounced();
 }
 
 function calcScore() {
@@ -6534,7 +6556,95 @@ function resetForm() {
   clrSig('sigR');
   switchSecteur();
   calcScore();
+  var _k = currentAuditKey(); if (_k) clearDraft(_k); // repartir de zéro = abandonner le brouillon
   toast('Nouveau rapport initialise.', 'inf');
+}
+
+// ════════ BROUILLON / REPRISE D'AUDIT (auto-save tant que non validé) ════════
+var DRAFT_PREFIX = 'haccp_draft_';
+function currentAuditKey() {
+  var sess = (typeof getSession === 'function') ? getSession() : null;
+  if (!sess) return null;
+  if (sess.code) return 'code:' + sess.code;
+  if (sess.auditClientInfo && sess.auditClientInfo.etab) return 'etab:' + sess.auditClientInfo.etab.trim().toLowerCase();
+  if (sess.info && sess.info.etab) return 'etab:' + sess.info.etab.trim().toLowerCase();
+  return null;
+}
+function getDraft(key) {
+  try { return JSON.parse(localStorage.getItem(DRAFT_PREFIX + key) || 'null'); } catch(e){ return null; }
+}
+function clearDraft(key) {
+  try { localStorage.removeItem(DRAFT_PREFIX + key); } catch(e){}
+}
+var _draftTimer = null;
+function saveDraft() {
+  var key = currentAuditKey();
+  if (!key) return;
+  var sels = [], notes = [];
+  document.querySelectorAll('.asel').forEach(function(s){ sels.push(s.value); });
+  document.querySelectorAll('.nr textarea').forEach(function(t){ notes.push(t.value); });
+  // Ne pas enregistrer un brouillon totalement vide
+  var answered = sels.filter(function(v){ return v && v !== '' && v !== 'na'; }).length;
+  var hasObs = (document.getElementById('obs1') && document.getElementById('obs1').value.trim()) ||
+               (document.getElementById('obs2') && document.getElementById('obs2').value.trim());
+  if (!answered && !hasObs) return;
+  var draft = {
+    m: {
+      etab: (document.getElementById('m-etab')||{}).value || '',
+      date: (document.getElementById('m-date')||{}).value || '',
+      resp: (document.getElementById('m-resp')||{}).value || '',
+      aud:  (document.getElementById('m-aud') ||{}).value || '',
+      type: (document.getElementById('m-type')||{}).value || '',
+      vis:  (document.getElementById('m-vis') ||{}).value || ''
+    },
+    sels: sels, notes: notes,
+    obs1: (document.getElementById('obs1')||{}).value || '',
+    obs2: (document.getElementById('obs2')||{}).value || '',
+    savedAt: Date.now()
+  };
+  try { localStorage.setItem(DRAFT_PREFIX + key, JSON.stringify(draft)); } catch(e){}
+}
+function saveDraftDebounced() {
+  if (_draftTimer) clearTimeout(_draftTimer);
+  _draftTimer = setTimeout(saveDraft, 600);
+}
+function restoreDraft(d) {
+  if (!d) return;
+  if (d.m && d.m.type) {
+    var mt = document.getElementById('m-type');
+    if (mt) { mt.value = d.m.type; if (typeof switchSecteur === 'function') switchSecteur(); }
+  }
+  setTimeout(function() {
+    var set = function(id, v){ var el = document.getElementById(id); if (el && v != null) el.value = v; };
+    if (d.m) { set('m-etab', d.m.etab); set('m-date', d.m.date); set('m-resp', d.m.resp); set('m-aud', d.m.aud); if (d.m.vis) set('m-vis', d.m.vis); }
+    var sels = document.querySelectorAll('.asel');
+    (d.sels || []).forEach(function(v, i){ if (sels[i]) sels[i].value = v; });
+    var notes = document.querySelectorAll('.nr textarea');
+    (d.notes || []).forEach(function(v, i){
+      if (notes[i] && v) {
+        notes[i].value = v;
+        var row = notes[i].closest('.nr'); if (row) row.classList.add('open'); // afficher les notes saisies
+      }
+    });
+    set('obs1', d.obs1 || ''); set('obs2', d.obs2 || '');
+    if (typeof calcScore === 'function') calcScore(); // réapplique aussi les couleurs des réponses
+    if (typeof toast === 'function') toast('🔄 Audit repris là où vous l\'aviez laissé.', 'ok');
+  }, 350);
+}
+function maybeOfferDraftRecovery() {
+  var key = currentAuditKey();
+  if (!key) return;
+  var d = getDraft(key);
+  if (!d || !d.sels) return;
+  var answered = d.sels.filter(function(v){ return v && v !== '' && v !== 'na'; }).length;
+  if (!answered) { clearDraft(key); return; }
+  var when = d.savedAt ? new Date(d.savedAt).toLocaleString('fr-FR') : '';
+  var msg = '🔄 Un audit en cours a été trouvé pour ce client\n('
+          + answered + ' réponse(s), enregistré le ' + when + ').\n\n'
+          + 'Reprendre cet audit là où vous l\'avez laissé ?\n\n'
+          + '• OK = Reprendre\n• Annuler = Recommencer à zéro';
+  if (confirm(msg)) { restoreDraft(d); }
+  else { clearDraft(key); }
 }
 
 // ════════ HISTORIQUE ════════
@@ -6594,6 +6704,7 @@ function saveHist() {
     localStorage.setItem('hh', JSON.stringify(h));
     toast('✓ Audit sauvegardé.', 'ok');
     saveAudit_remote(d);
+    var _k = currentAuditKey(); if (_k) clearDraft(_k); // audit validé → brouillon effacé
   } catch(e) { toast('Erreur de sauvegarde.', 'err'); }
 }
 function saveAudit_remote(d) {
@@ -8237,6 +8348,7 @@ function showAuditDetail(idx) {
 function editAuditFromCloud(idx) {
   var a = window._auditsData && window._auditsData[idx];
   if (!a) { alert('Audit introuvable.'); return; }
+  window._loadingExistingAudit = true; // ne pas proposer la reprise de brouillon
   var modal = document.getElementById('auditDetailModal');
   if (modal) modal.style.display = 'none';
   // Restaurer la fiche client dans la session (pré-remplissage rapport)
@@ -8319,6 +8431,7 @@ function closeHist(e) {
 function loadAudit(id) {
   const h = JSON.parse(localStorage.getItem('hh') || '[]');
   const a = h.find(function(x) { return x.id === id; }); if (!a) return;
+  window._loadingExistingAudit = true; // ne pas proposer la reprise de brouillon
 
   // Restaurer auditClientInfo dans la session pour que initApp() l'utilise
   var sess = (typeof getSession === 'function') ? getSession() : null;
@@ -8454,6 +8567,14 @@ function initApp() {
   }, 150);
 
   var sess = getSession();
+
+  // Reprise d'audit : proposer de récupérer un brouillon non validé pour ce client.
+  // (sauf si on vient de charger/modifier explicitement un audit existant)
+  if (window._loadingExistingAudit) {
+    window._loadingExistingAudit = false;
+  } else {
+    setTimeout(maybeOfferDraftRecovery, 650);
+  }
 
   // Pré-remplir depuis auditClientInfo (admin qui lance audit pour un client)
   if (sess && sess.role === 'admin' && sess.auditClientInfo) {
