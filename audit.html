@@ -6483,7 +6483,21 @@ function toast(m, t) {
   setTimeout(function() { if (d.parentNode) d.parentNode.removeChild(d); }, 3000);
 }
 
-function doPrint() { window.print(); }
+function doPrint() {
+  // Produire un PDF PROPRE (le rapport professionnel) plutôt que la checklist brute
+  var rpt = document.getElementById('rptBody');
+  if (rpt && rpt.innerHTML && rpt.innerHTML.length > 50) {
+    printRpt();
+    return;
+  }
+  // Pas encore généré : on génère le rapport puis on imprime proprement
+  try { if (typeof genRapport === 'function') genRapport(); } catch(e) { console.error('genRapport (doPrint):', e); }
+  setTimeout(function() {
+    var r = document.getElementById('rptBody');
+    if (r && r.innerHTML && r.innerHTML.length > 50) printRpt();
+    else window.print(); // repli ultime
+  }, 250);
+}
 
 function printRpt() {
   var rptContent = document.getElementById('rptBody').innerHTML;
@@ -6495,8 +6509,9 @@ function printRpt() {
   win.document.write('<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@400;600;700;800&display=swap" rel="stylesheet">');
   win.document.write('<style>');
   win.document.write(':root{--navy:#153e35;--teal:#2d6f60;--ok:#3aaa7a;--warn:#e8913a;--danger:#e05252;--bg:#f5f2ea;--border:#dfe6e0;--text:#153e35;--muted:#65716b;}');
-  win.document.write('*{box-sizing:border-box;margin:0;padding:0}');
+  win.document.write('*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}');
   win.document.write('body{font-family:"DM Sans",sans-serif;background:#fff;color:#153e35;padding:20px}');
+  win.document.write('table,tr,td,th,.rpt-sec-ttl,img{break-inside:avoid}');
   win.document.write('.rpt-sec-ttl{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#65716b;margin:22px 0 9px;border-bottom:1px solid #dfe6e0;padding-bottom:5px}');
   win.document.write('.rpt-table{width:100%;border-collapse:collapse;margin-bottom:16px}');
   win.document.write('.rpt-table th{background:#f5f2ea;padding:8px 12px;text-align:left;font-size:.71rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#65716b;border-bottom:2px solid #dfe6e0}');
