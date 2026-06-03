@@ -17,6 +17,35 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(function () {});
   });
 }
+// ── Bouton « Installer l'application » (PWA) ──
+(function () {
+  var deferredPrompt = null;
+  function showInstallBtn() {
+    if (!document.body) { document.addEventListener('DOMContentLoaded', showInstallBtn); return; }
+    if (document.getElementById('pwaInstallBtn')) return;
+    var b = document.createElement('button');
+    b.id = 'pwaInstallBtn';
+    b.type = 'button';
+    b.setAttribute('aria-label', "Installer l'application");
+    b.textContent = "📥 Installer l'application";
+    b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:99999;background:#153e35;color:#fff;border:none;border-radius:999px;padding:12px 18px;font-family:\'Source Sans 3\',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.32)';
+    b.onclick = function () {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function () { deferredPrompt = null; b.remove(); });
+    };
+    document.body.appendChild(b);
+  }
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    showInstallBtn();
+  });
+  window.addEventListener('appinstalled', function () {
+    deferredPrompt = null;
+    var b = document.getElementById('pwaInstallBtn'); if (b) b.remove();
+  });
+})();
 </script>
 
 <title>Clean Food | Audit Hygiène & Sécurité Alimentaire — HACCP</title>
