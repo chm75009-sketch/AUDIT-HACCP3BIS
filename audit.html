@@ -25,6 +25,11 @@ if ('serviceWorker' in navigator) {
     return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
   }
   function instructions() {
+    var ua = navigator.userAgent || '';
+    if (/Firefox\//.test(ua) && !/Seamonkey/.test(ua)) {
+      alert("Firefox (sur PC) ne permet pas d'installer les applications web.\n\nPour installer l'application sur votre PC, ouvrez ce même site dans Microsoft Edge (déjà présent sur Windows 10) ou Google Chrome, puis :\n• Edge : menu ··· → Applications → « Installer ce site en tant qu'application ».\n• Chrome : menu ⋮ → « Installer l'application… ».\n\n(Dans Firefox, vous pouvez seulement créer un raccourci : faites glisser l'adresse du site, à gauche de la barre d'adresse, vers le Bureau.)");
+      return;
+    }
     alert("Pour installer l'application sur ce PC (Windows 10) :\n\n• Microsoft Edge : menu ··· (en haut à droite) → Applications → « Installer ce site en tant qu'application ».\n• Google Chrome : menu ⋮ → « Installer l'application… », ou l'icône ⊞ dans la barre d'adresse.\n\nUne icône sera créée sur le Bureau et dans le menu Démarrer.");
   }
   function showInstallBtn() {
