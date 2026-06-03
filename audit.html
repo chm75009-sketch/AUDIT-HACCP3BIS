@@ -5712,33 +5712,52 @@ const SPECIFIQUE = {
     ]}
   ],
   BOUCHERIE: [
-    { name: "DÉCOUPE, HACHAGE & PRÉPARATIONS", items: [
+    { name: "RÉCEPTION & MATIÈRES PREMIÈRES VIANDE", items: [
+      { l: "Marque de salubrité / estampille vétérinaire", w: 3, ref: "Présente et conforme à réception (Règl. 853/2004)" },
       { l: "Température de l'atelier de découpe", w: 3, ref: "≤ +12°C pendant les opérations", type: "temp" },
-      { l: "Hachage à la demande", w: 3, ref: "Viande hachée consommée le jour même" },
-      { l: "Préparations assaisonnées", w: 3, ref: "≤ +4°C, DLC 24h si non emballé", type: "temp" },
-      { l: "Couteaux / planches désinfectés entre espèces", w: 2, ref: "Pas de contamination croisée" },
-      { l: "Mise sous vide", w: 2, ref: "≤ +4°C, étiquetage DLC, traçabilité assurée", type: "temp" },
-      { l: "Refroidissement rapide après pré-cuisson", w: 3, ref: "+63°C → +10°C en < 2h", type: "temp" },
-      { l: "Carpaccio / tartare", w: 3, ref: "Viande traçable, préparé à la commande, servi immédiatement" }
-    ]},
-    { name: "PRODUITS, ÉTIQUETAGE & ORIGINE VIANDE", items: [
-      { l: "Étiquetage origine viande bovine", w: 3, ref: "Naissance, élevage, abattage (Règl. 1760/2000)" },
-      { l: "Marque de salubrité / estampille vétérinaire", w: 3, ref: "Présente et conforme à réception" },
-      { l: "Séparation des espèces au stockage", w: 2, ref: "Bovins, porcins, volailles, abats isolés" },
+      { l: "Séparation des espèces (bovins / porcins / volailles / abats)", w: 2, ref: "Isolées dès la réception et au stockage" },
       { l: "Abats réfrigérés", w: 3, ref: "≤ +3°C, DLC 24h si non emballés", type: "temp" },
-      { l: "Vitrine de vente réfrigérée", w: 3, ref: "≤ +4°C, propre, joints sains", type: "temp" }
+      { l: "Volailles & gibier isolés", w: 3, ref: "Bac fermé, jamais au-dessus des autres viandes" },
+      { l: "Carcasses / quartiers suspendus", w: 2, ref: "Sur crochets/rails, sans contact sol ni mur" }
+    ]},
+    { name: "DÉCOUPE, HACHAGE & PRÉPARATIONS", items: [
+      { l: "Hachage à la demande", w: 3, ref: "Viande hachée consommée le jour même ; traçabilité du lot" },
+      { l: "Préparations assaisonnées (chair à saucisse, brochettes)", w: 3, ref: "≤ +4°C, DLC 24h si non emballé", type: "temp" },
+      { l: "Couteaux / planches désinfectés entre espèces", w: 2, ref: "Code couleur, pas de contamination croisée" },
+      { l: "Carpaccio / tartare", w: 3, ref: "Viande traçable, préparé à la commande, servi immédiatement" },
+      { l: "Mise sous vide", w: 2, ref: "≤ +4°C, étiquetage DLC, traçabilité assurée", type: "temp" },
+      { l: "Marinades / saumures", w: 2, ref: "Conservées à +4°C, DLC, contenant identifié" },
+      { l: "Maturation / rassissement (chambre dédiée)", w: 2, ref: "T° et hygrométrie maîtrisées, traçabilité", type: "temp" }
+    ]},
+    { name: "CHARCUTERIE MAISON & PRODUITS ÉLABORÉS", items: [
+      { l: "Cuisson des produits de charcuterie (pâtés, terrines, rôtis cuits)", w: 3, ref: "≥ +70°C à cœur, sonde étalonnée", type: "temp" },
+      { l: "Refroidissement rapide après cuisson", w: 3, ref: "+63°C → +10°C à cœur en < 2h ; cellule", type: "temp" },
+      { l: "Salaison / sels nitrités", w: 2, ref: "Dosage maîtrisé et tracé, local frais dédié" },
+      { l: "Fumaison (si pratiquée)", w: 1, ref: "Maîtrise de la température, maîtrise des HAP" },
+      { l: "Produits cuits / prêts à consommer séparés du cru", w: 3, ref: "Zone et matériel dédiés, jamais de contact cru/cuit" }
+    ]},
+    { name: "VENTE, ÉTIQUETAGE & ORIGINE", items: [
+      { l: "Étiquetage origine viande bovine", w: 3, ref: "Naissance, élevage, abattage (Règl. 1760/2000)" },
+      { l: "Origine des autres viandes (porc, volaille, ovin)", w: 2, ref: "Affichée (Décret origine viandes)" },
+      { l: "Vitrine de vente réfrigérée", w: 3, ref: "≤ +4°C, propre, joints sains", type: "temp" },
+      { l: "DLC/DDM des produits en vente", w: 3, ref: "Respectées, aucun produit dépassé" },
+      { l: "Étiquetage produits élaborés (composition, allergènes, poids)", w: 2, ref: "Règl. UE 1169/2011" },
+      { l: "Affichage des prix", w: 1, ref: "Au kg / à la pièce, conforme" }
     ]},
     { name: "AGRÉMENT & SOUS-PRODUITS ANIMAUX", items: [
       { l: "Agrément sanitaire ou dérogation à l'agrément", w: 3, ref: "En cours de validité (DDPP)", type: "doc" },
-      { l: "Sous-produits animaux catégorie 3", w: 2, ref: "Bac dédié identifié, enlèvement tracé" },
+      { l: "Sous-produits animaux catégorie 3 (os, gras, parures)", w: 2, ref: "Bac dédié identifié, réfrigéré, enlèvement tracé" },
       { l: "Bordereaux d'enlèvement SPA", w: 2, ref: "Conservés (Règl. 1069/2009)", type: "doc" }
     ]},
     { name: "ANNEXE — MATÉRIEL DE BOUCHERIE", items: [
       { l: "Hachoir", w: 3, ref: "Démonté, nettoyé et désinfecté après chaque usage ; pas de viande incrustée" },
       { l: "Trancheuse", w: 3, ref: "Lame et carter démontés, désinfectés ; protection conforme" },
-      { l: "Scie à os", w: 2, ref: "Lame propre, sans débris ; nettoyage tracé" },
+      { l: "Scie à os", w: 2, ref: "Lame propre, sans débris ni sciure ; nettoyage tracé" },
       { l: "Poussoir / hachoir à saucisses", w: 2, ref: "Démonté et désinfecté ; joints sains" },
-      { l: "Billot / plan de découpe", w: 2, ref: "Sans fissure, raboté/désinfecté, matériau alimentaire" }
+      { l: "Cutter / mêleuse (charcuterie)", w: 2, ref: "Cuve et couteaux désinfectés entre préparations" },
+      { l: "Attendrisseur / piqueuse (si utilisé)", w: 2, ref: "Démonté et désinfecté (perforation = risque interne)" },
+      { l: "Billot / plan de découpe", w: 2, ref: "Sans fissure, raboté/désinfecté, matériau alimentaire" },
+      { l: "Crochets / rails / balances", w: 1, ref: "Propres, sans rouille, balances vérifiées" }
     ]}
   ],
   BOULANGERIE: [
