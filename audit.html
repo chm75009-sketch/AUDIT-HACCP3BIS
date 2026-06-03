@@ -854,6 +854,7 @@ body{background:#fff}
     <!-- SECTION : Démarrer un audit directement en tant qu'admin -->
     <div class="admin-section">
       <h2><span style="background:#153e35;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:.7rem">📋</span>&nbsp; Codes d'accès</h2>
+      <div id="syncIndicator" style="font-size:.82rem;margin:0 0 12px;padding:9px 14px;background:#fbfaf7;border:1px solid #dfe6e0;border-radius:8px"></div>
       <div id="codesTableWrap"></div>
     </div>
 
@@ -2935,17 +2936,160 @@ function deleteCode_remote(code) {
   });
 }
 
+// ══════════════════════════════════════════
+//   FILE D'ATTENTE DE SYNCHRONISATION (codes non envoyés à Supabase)
+// ══════════════════════════════════════════
+var PENDING_CODES_KEY = 'haccp_pending_codes';
+
+function getPendingCodes() {
+  try { return JSON.parse(localStorage.getItem(PENDING_CODES_KEY) || '[]'); } catch(e){ return []; }
+}
+function savePendingCodes(list) {
+  localStorage.setItem(PENDING_CODES_KEY, JSON.stringify(list || []));
+}
+function addPendingCode(codeObj) {
+  var list = getPendingCodes();
+  if (!list.find(function(c){ return c.code === codeObj.code; })) {
+    list.push(codeObj);
+    savePendingCodes(list);
+  }
+}
+function removePendingCode(code) {
+  savePendingCodes(getPendingCodes().filter(function(c){ return c.code !== code; }));
+}
+// Marque un code comme synchronisé dans le cache local + retire de la file
+function markCodeSynced(code) {
+  var codes = getCodes();
+  var changed = false;
+  codes.forEach(function(c){ if (c.code === code && c._pending) { c._pending = false; changed = true; } });
+  if (changed) saveCodes(codes);
+  removePendingCode(code);
+}
+
+// Envoie UN code vers Supabase et CONFIRME l'insertion (lecture du statut HTTP).
+// Résout { ok:true } ou { ok:false, error:'...' } — ne rejette jamais.
+function syncCodeToSupabase(codeObj) {
+  return fetch(SUPABASE_URL + '/rest/v1/codes', {
+    method: 'POST',
+    headers: Object.assign({}, sbHeaders(), { 'Prefer': 'return=representation' }),
+    body: JSON.stringify({
+      code: codeObj.code,
+      client: codeObj.client,
+      info: JSON.stringify(codeObj.info || {}),
+      type: codeObj.type || null,
+      service_type: codeObj.serviceType || null,
+      docs_unlocked: codeObj.docsUnlocked || false,
+      exp: codeObj.exp || null,
+      used: codeObj.used || false
+    })
+  }).then(function(r){
+    if (r.ok) { markCodeSynced(codeObj.code); return { ok:true }; }
+    // 409 = code déjà présent dans Supabase → considéré comme synchronisé
+    if (r.status === 409) { markCodeSynced(codeObj.code); return { ok:true }; }
+    return r.text().then(function(t){ return { ok:false, error:'HTTP '+r.status+' '+(t||'') }; });
+  }).catch(function(e){
+    return { ok:false, error:(e&&e.message)?e.message:'Réseau indisponible' };
+  });
+}
+
+// Persiste un NOUVEAU code : marque en attente, ajoute à la file, tente l'envoi distant.
+// Retourne une promesse { ok, error }. Le cache local doit déjà contenir le code.
+function persistNewCode(codeObj) {
+  codeObj._pending = true;
+  var codes = getCodes();
+  var existing = codes.find(function(c){ return c.code === codeObj.code; });
+  if (existing) existing._pending = true;
+  saveCodes(codes);
+  addPendingCode(codeObj);
+  updateSyncIndicator();
+  return syncCodeToSupabase(codeObj).then(function(res){
+    updateSyncIndicator();
+    return res;
+  });
+}
+
+// Re-tente l'envoi de tous les codes de la file. callback(ok, fail).
+function flushPendingQueue(callback) {
+  var list = getPendingCodes();
+  if (!list.length) { updateSyncIndicator(); if (callback) callback(0, 0); return; }
+  var ok = 0, fail = 0, done = 0;
+  list.forEach(function(codeObj){
+    syncCodeToSupabase(codeObj).then(function(res){
+      if (res.ok) ok++; else fail++;
+      done++;
+      if (done === list.length) {
+        updateSyncIndicator();
+        if (callback) callback(ok, fail);
+      }
+    });
+  });
+}
+
+// FUSION : intègre les codes distants SANS écraser les codes locaux en attente.
+// Si le distant est vide/indisponible, on conserve le cache local tel quel.
+function mergeRemoteCodes(remoteCodes) {
+  var local = getCodes();
+  if (!Array.isArray(remoteCodes) || remoteCodes.length === 0) return local;
+  var remoteMap = {};
+  remoteCodes.forEach(function(c){ remoteMap[c.code] = true; });
+  var merged = remoteCodes.slice();
+  // Ré-injecter les codes locaux en attente absents du distant (jamais les perdre)
+  local.forEach(function(c){
+    if (c._pending && !remoteMap[c.code]) merged.unshift(c);
+  });
+  // Nettoyer la file : retirer ceux désormais présents dans le distant
+  var pending = getPendingCodes();
+  var stillPending = pending.filter(function(c){ return !remoteMap[c.code]; });
+  if (stillPending.length !== pending.length) savePendingCodes(stillPending);
+  saveCodes(merged);
+  return merged;
+}
+
+// Indicateur « X non synchronisé(s) » + bouton dans l'admin
+function updateSyncIndicator() {
+  var el = document.getElementById('syncIndicator');
+  if (!el) return;
+  var n = getPendingCodes().length;
+  if (n === 0) {
+    el.innerHTML = '<span style="color:#2d6a4f;font-weight:600">✅ Tous les codes sont synchronisés avec le cloud.</span>';
+  } else {
+    el.innerHTML = '<span style="color:#b7410e;font-weight:700">⚠️ ' + n + ' code' + (n>1?'s':'') + ' non synchronisé' + (n>1?'s':'') + ' — les clients ne pourront pas encore l\'utiliser.</span>' +
+      ' <button onclick="manualSync()" style="margin-left:8px;padding:5px 12px;background:#1f5649;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.78rem;font-weight:600">🔄 Synchroniser maintenant</button>';
+  }
+}
+function manualSync() {
+  var el = document.getElementById('syncIndicator');
+  if (el) el.innerHTML = '<span style="color:#65716b">⏳ Synchronisation en cours…</span>';
+  flushPendingQueue(function(ok, fail){
+    updateSyncIndicator();
+    refreshAdminTable();
+    if (fail > 0)      { if (typeof toast==='function') toast('⚠️ ' + fail + ' code(s) toujours non synchronisé(s). Vérifiez votre connexion.', 'err'); }
+    else if (ok > 0)   { if (typeof toast==='function') toast('✅ ' + ok + ' code(s) synchronisé(s).', 'ok'); }
+    else               { if (typeof toast==='function') toast('Rien à synchroniser.', 'ok'); }
+  });
+}
+
+// Re-tentative automatique dès que la connexion revient
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('online', function(){ flushPendingQueue(function(){ if (typeof refreshAdminTable==='function') refreshAdminTable(); }); });
+}
+
 // ── Synchronisation au chargement admin ──
 function syncFromSupabase(callback) {
-  Promise.all([fetchDemandes_remote(), fetchCodes_remote()]).then(function(results) {
-    var demandes = results[0];
-    var codes = results[1];
-    saveDemandes(demandes);
-    saveCodes(codes);
-    if (callback) callback();
-  }).catch(function(err) {
-    console.error('Supabase sync error:', err);
-    if (callback) callback();
+  // On tente d'abord d'écouler la file d'attente, puis on récupère le distant
+  flushPendingQueue(function(){
+    Promise.all([fetchDemandes_remote(), fetchCodes_remote()]).then(function(results) {
+      var demandes = results[0];
+      var codes = results[1];
+      saveDemandes(demandes);
+      mergeRemoteCodes(codes); // FUSION (ne jamais écraser un code local en attente)
+      updateSyncIndicator();
+      if (callback) callback();
+    }).catch(function(err) {
+      console.error('Supabase sync error:', err);
+      updateSyncIndicator();
+      if (callback) callback();
+    });
   });
 }
 
@@ -3055,7 +3199,7 @@ function genDocCode() {
   var code = makeDocCode();
   while (codes.find(function(c){ return c.code === code; })) { code = makeDocCode(); }
 
-  codes.unshift({
+  var docCodeObj = {
     code: code,
     client: existing.client,
     info: existing.info || { etab: existing.client },
@@ -3064,8 +3208,10 @@ function genDocCode() {
     exp: exp || null,
     used: false,
     created: Date.now()
-  });
+  };
+  codes.unshift(docCodeObj);
   saveCodes(codes);
+  persistNewCode(docCodeObj); // synchroniser vers Supabase (sinon « Code invalide » côté client)
 
   sel.value = '';
   document.getElementById('doc_exp').value = '';
@@ -3728,7 +3874,7 @@ function loginClient() {
   if (!code) { if (err) { err.textContent = 'Veuillez saisir votre code d\'accès.'; err.style.display = 'block'; } return; }
   // Sync codes depuis Supabase avant vérification
   fetchCodes_remote().then(function(remoteCodes) {
-    if (remoteCodes && remoteCodes.length > 0) saveCodes(remoteCodes);
+    mergeRemoteCodes(remoteCodes);
   }).catch(function(){
     // Supabase inaccessible - on continue avec les codes en cache local
   }).finally(function() {
@@ -3995,7 +4141,7 @@ function genererCodeDocsExistant() {
     docsUnlocked: true, exp: null, used: false, created: Date.now()
   });
   saveCodes(allCodes);
-  saveCode_remote(allCodes[0]).catch(function(e){ console.error('Supabase genDocsExistant:', e); });
+  persistNewCode(allCodes[0]);
   refreshAdminTable();
   if (navigator.clipboard) navigator.clipboard.writeText(code).catch(function(){});
   alert('✅ Code Documents généré : '+code+'\n\nCopié dans le presse-papier.\nTransmettez-le à : '+(chosen.client||'')+'\n\n📄 Ce code donne accès à tous les documents (200 €)');
@@ -4059,7 +4205,7 @@ function genererCodeFullExistant(typeService) {
   var allCodes = getCodes();
   allCodes.unshift({ code:code, client:chosen.client, info:chosen.info||{}, type:'full', serviceType:codeType, docsUnlocked:true, exp:null, used:false, created:Date.now() });
   saveCodes(allCodes);
-  saveCode_remote(allCodes[0]).catch(function(e){ console.error('Supabase genFullExistant:', e); });
+  persistNewCode(allCodes[0]);
   refreshAdminTable();
   if (navigator.clipboard) navigator.clipboard.writeText(code).catch(function(){});
   var label = codeType === 'full_admin' ? '⭐ Full premium — 450 €' : '🎯 Full client — 350 €';
@@ -4805,7 +4951,6 @@ function genCode() {
   };
   codes.unshift(newCodeObj);
   saveCodes(codes);
-  saveCode_remote(newCodeObj).catch(function(e){ console.error('Supabase code:', e); });
 
   ['ci_resp','ci_etab','ci_adresse','ci_tel','ci_email','ci_siret','ci_siren',
    'ci_effectif','ci_repas','ci_legal','ci_auditeur','newCodeExp'].forEach(function(id){
@@ -4817,12 +4962,19 @@ function genCode() {
 
   refreshAdminTable();
   if (navigator.clipboard) navigator.clipboard.writeText(code).catch(function(){});
-  
-  // Envoyer le code par email au client
-  var serviceLabel = '🔑 Audit client — 200 €';
-  envoyerCodeParEmail(newCodeObj.info, code, serviceLabel);
-  
-  alert('✅ Code généré : ' + code + '\n\nCe code a été copié dans le presse-papier.\nUn email a été envoyé à : ' + email + '\nTransmettez-le aussi à : ' + resp + ' (' + etab + ')');
+
+  // CONFIRMER l'insertion Supabase AVANT d'afficher le code (file d'attente + retry)
+  persistNewCode(newCodeObj).then(function(res){
+    refreshAdminTable();
+    if (res.ok) {
+      // Envoyer le code par email au client (uniquement si bien synchronisé)
+      var serviceLabel = '🔑 Audit client — 200 €';
+      envoyerCodeParEmail(newCodeObj.info, code, serviceLabel);
+      alert('✅ Code généré ET synchronisé : ' + code + '\n\nCe code a été copié dans le presse-papier.\nUn email a été envoyé à : ' + email + '\nTransmettez-le aussi à : ' + resp + ' (' + etab + ')');
+    } else {
+      alert('⚠️ Code non synchronisé — reconnectez-vous à internet, le code ne marchera pas encore.\n\nCode : ' + code + '\nClient : ' + resp + ' (' + etab + ')\n\nIl est enregistré localement et sera envoyé automatiquement dès le retour de la connexion (ou via le bouton « Synchroniser maintenant »). N\'envoyez le code au client qu\'une fois synchronisé.\n\n(Détail technique : ' + (res.error || 'connexion indisponible') + ')');
+    }
+  });
 }
 
 function saveAdminEmailFromInput() {
@@ -4970,7 +5122,7 @@ function genererCodeDepuisDemande(idx, type) {
   if (demandeId) {
     updateDemande_remote(demandeId, 'traite', code).catch(function(e){ console.error('Supabase update demande:', e); });
   }
-  saveCode_remote(allCodes[0]).catch(function(e){ console.error('Supabase save code:', e); });
+  persistNewCode(allCodes[0]);
   refreshAdminTable();
 
   // Copie sécurisée dans le presse-papier
@@ -5076,7 +5228,7 @@ function renewCode(oldCode) {
     created: Date.now()
   });
   saveCodes(codes);
-  saveCode_remote(codes[0]).catch(function(e){ console.error('Supabase renewCode:', e); });
+  persistNewCode(codes[0]);
   refreshAdminTable();
 
   if (navigator.clipboard) navigator.clipboard.writeText(newCode).catch(function(){});
@@ -5092,8 +5244,9 @@ function copyCode(code) {
 }
 
 function refreshAdminTable() {
-  // Sync Supabase silencieux pour avoir tous les clients à jour
-  fetchCodes_remote().then(function(remote){ if(remote&&remote.length) saveCodes(remote); }).catch(function(){});
+  // Sync Supabase silencieux pour avoir tous les clients à jour — FUSION, pas écrasement
+  fetchCodes_remote().then(function(remote){ mergeRemoteCodes(remote); }).catch(function(){});
+  updateSyncIndicator();
   var codes = getCodes();
   var total = codes.filter(function(c){ return c.type !== 'admin_temp'; }).length;
   var newC  = codes.filter(function(c){ return !c.used && (!c.exp || new Date(c.exp)>=new Date()) && c.type !== 'admin_temp'; }).length;
