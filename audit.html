@@ -5671,7 +5671,9 @@ const SECTEURS = {
       { l: "Certificat de ramonage annuel (four / conduits)", w: 2, ref: "Annuel, archivé", type: "doc" },
       { l: "Étalonnage des thermomètres / sondes", w: 2, ref: "Certificats valides", type: "doc" },
       { l: "Attestation d'entretien des groupes froids", w: 2, ref: "Annuelle", type: "doc" },
-      { l: "Contrats & rapports : nuisibles, huiles usagées, biodéchets", w: 2, ref: "Signés et à jour", type: "doc" },
+      { l: "Contrat & rapports — nuisibles (dératisation / désinsectisation)", w: 2, ref: "Signé et à jour", type: "doc" },
+      { l: "Contrat & bordereaux — huiles usagées", w: 2, ref: "Enlèvement tracé", type: "doc" },
+      { l: "Contrat & bordereaux — biodéchets (loi AGEC)", w: 2, ref: "Collecte tracée", type: "doc" },
       { l: "Potabilité de l'eau (analyses si réseau privé)", w: 2, ref: "Conforme", type: "doc" },
       { l: "Registres & enregistrements (T°, nettoyage, NC)", w: 2, ref: "Tenus et à jour", type: "doc" }
     ]},
@@ -8216,15 +8218,57 @@ function showAuditDetail(idx) {
     html += '<div style="margin-top:14px"><div style="font-weight:700;color:#153e35;font-size:.8rem;text-transform:uppercase;margin-bottom:8px">📄 Rapport complet</div>';
     html += '<div style="border:1px solid #dfe6e0;border-radius:8px;padding:16px;max-height:300px;overflow-y:auto;font-size:.8rem">' + a.rapport_html + '</div></div>';
   }
-  // Bouton de téléchargement en Word
-  html += '<div style="text-align:center;margin:18px 0 6px"><button id="btnDlDetailWord" style="padding:10px 20px;background:#1f5649;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:\'Source Sans 3\',sans-serif;font-size:.85rem;font-weight:700">⬇ Télécharger en Word</button></div>';
+  // Boutons : Modifier l'audit + Télécharger en Word
+  html += '<div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:18px 0 6px">';
+  html += '<button id="btnEditAuditDetail" style="padding:10px 20px;background:#fff;color:#2d6f60;border:1.5px solid #2d6f60;border-radius:10px;cursor:pointer;font-family:\'Source Sans 3\',sans-serif;font-size:.85rem;font-weight:700">✏️ Modifier l\'audit</button>';
+  html += '<button id="btnDlDetailWord" style="padding:10px 20px;background:#1f5649;color:#fff;border:none;border-radius:10px;cursor:pointer;font-family:\'Source Sans 3\',sans-serif;font-size:.85rem;font-weight:700">⬇ Télécharger en Word</button>';
+  html += '</div>';
   html += '</div>';
   modal.innerHTML = html;
   modal.style.display = 'flex';
   modal.onclick = function(e) { if (e.target === modal) modal.style.display = 'none'; };
   var btn = document.getElementById('btnDlDetailWord');
   if (btn) btn.onclick = function(ev) { ev.stopPropagation(); _genDetailWord(a); };
+  var btnEdit = document.getElementById('btnEditAuditDetail');
+  if (btnEdit) btnEdit.onclick = function(ev) { ev.stopPropagation(); editAuditFromCloud(idx); };
 }
+
+// Recharge un audit du CLOUD dans le formulaire éditable (modification → nouvelle version à la sauvegarde)
+function editAuditFromCloud(idx) {
+  var a = window._auditsData && window._auditsData[idx];
+  if (!a) { alert('Audit introuvable.'); return; }
+  var modal = document.getElementById('auditDetailModal');
+  if (modal) modal.style.display = 'none';
+  // Restaurer la fiche client dans la session (pré-remplissage rapport)
+  var sess = (typeof getSession === 'function') ? getSession() : null;
+  var ci = { etab:a.etab||'', resp:a.resp||'', adresse:a.adresse||'', tel:a.tel||'',
+             email:a.email||'', siret:a.siret||'', secteur:a.secteur||'',
+             auditeur:a.auditeur||'', visite:a.visite||'' };
+  if (sess) { sess.auditClientInfo = ci; if (typeof setSession === 'function') setSession(sess); }
+  // Afficher l'app d'audit avec la barre admin
+  showApp('admin');
+  // Restaurer le secteur puis générer la grille de questions
+  if (a.secteur) {
+    var mt = document.getElementById('m-type');
+    if (mt) { mt.value = a.secteur; if (typeof switchSecteur === 'function') switchSecteur(); }
+  }
+  setTimeout(function() {
+    var set = function(id, v){ var el = document.getElementById(id); if (el && v != null) el.value = v; };
+    set('m-etab', a.etab || '');
+    set('m-date', a.date_audit || '');
+    set('m-resp', a.resp || '');
+    set('m-aud',  a.auditeur || '');
+    if (a.visite) set('m-vis', a.visite);
+    // Restaurer les réponses (même ordre que la grille du secteur)
+    var sels = document.querySelectorAll('.asel');
+    (a.sels || []).forEach(function(v, i){ if (sels[i]) sels[i].value = v; });
+    set('obs1', a.obs1 || '');
+    set('obs2', a.obs2 || '');
+    if (typeof calcScore === 'function') calcScore();
+    if (typeof toast === 'function') toast('✏️ Audit chargé pour modification. Modifiez puis « 💾 Sauvegarder » — une nouvelle version sera enregistrée.', 'inf');
+  }, 400);
+}
+
 function openHist() {
   const h = JSON.parse(localStorage.getItem('hh') || '[]');
   const l = document.getElementById('hlist');
