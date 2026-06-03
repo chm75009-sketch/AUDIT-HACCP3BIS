@@ -3008,6 +3008,32 @@ function persistNewCode(codeObj) {
   });
 }
 
+// Finalise la creation d'un code depuis le formulaire « Nouveau client » :
+// CONFIRME la synchro Supabase AVANT d'afficher le code et d'envoyer l'email.
+// opts: { label, emailLabel, extra, showChoix }
+function finaliserCreationCode(codeObj, opts) {
+  opts = opts || {};
+  var info = codeObj.info || {};
+  if (navigator.clipboard) navigator.clipboard.writeText(codeObj.code).catch(function(){});
+  if (typeof refreshAdminTable === 'function') refreshAdminTable();
+  return persistNewCode(codeObj).then(function(res){
+    if (typeof refreshAdminTable === 'function') refreshAdminTable();
+    if (res.ok) {
+      if (opts.emailLabel) envoyerCodeParEmail(info, codeObj.code, opts.emailLabel);
+      alert('✅ Code ' + (opts.label ? opts.label + ' ' : '') + 'créé ET synchronisé : ' + codeObj.code +
+            '\n\nCopié dans le presse-papier.' +
+            (info.email ? '\n📧 Email envoyé à : ' + info.email : '\nAucun email renseigné — transmettez le code manuellement.') +
+            (opts.extra ? '\n\n' + opts.extra : ''));
+    } else {
+      alert('⚠️ Code NON synchronisé — reconnectez-vous à internet, le code ne marchera pas encore.\n\n' +
+            'Code : ' + codeObj.code + '\nClient : ' + (info.etab || '') +
+            '\n\nIl est enregistré localement et sera envoyé automatiquement dès le retour de la connexion (ou via le bouton « Synchroniser maintenant » dans l\'admin). N\'envoyez PAS le code au client tant qu\'il n\'est pas synchronisé.\n\n(Détail technique : ' + (res.error || 'connexion indisponible') + ')');
+    }
+    if (opts.showChoix && typeof showAdminChoix === 'function') showAdminChoix();
+    return res;
+  });
+}
+
 // Re-tente l'envoi de tous les codes de la file. callback(ok, fail).
 function flushPendingQueue(callback) {
   var list = getPendingCodes();
@@ -4152,12 +4178,10 @@ function creerCodeDocsSeulement() {
   if (!info) return;
   var code = makeUniqueCode(makeDocCode);
   var codes = getCodes();
-  codes.unshift({ code:code, client:info.etab, info:info, type:'docs', docsUnlocked:true, exp:null, used:false, created:Date.now() });
+  var nouveauCode = { code:code, client:info.etab, info:info, type:'docs', docsUnlocked:true, exp:null, used:false, created:Date.now() };
+  codes.unshift(nouveauCode);
   saveCodes(codes);
-  if (navigator.clipboard) navigator.clipboard.writeText(code).catch(function(){});
-  envoyerCodeParEmail(info, code, '📄 Pack Documents — 250 €');
-  alert('✅ Code Documents généré : '+code+'\n\nCopié dans le presse-papier.\nTransmettez-le à : '+info.etab+'\n\n📄 Pack Documents — 250 €\n(ou 100 € par document à l\'unité)');
-  showAdminChoix();
+  finaliserCreationCode(nouveauCode, { label:'Documents', emailLabel:'📄 Pack Documents — 250 €', extra:'📄 Pack Documents — 250 € (ou 100 € par document à l\'unité)', showChoix:true });
 }
 
 function creerCodeFullSeulement(typeService) {
@@ -4169,12 +4193,10 @@ function creerCodeFullSeulement(typeService) {
   if (typeService === 'full_admin') {
     var code = makeUniqueCode(makeDocCode);
     var codes = getCodes();
-    codes.unshift({ code:code, client:info.etab, info:info, type:'docs', serviceType:'full_admin', docsUnlocked:true, exp:null, used:false, created:Date.now() });
+    var nouveauCode = { code:code, client:info.etab, info:info, type:'docs', serviceType:'full_admin', docsUnlocked:true, exp:null, used:false, created:Date.now() };
+    codes.unshift(nouveauCode);
     saveCodes(codes);
-    if (navigator.clipboard) navigator.clipboard.writeText(code).catch(function(){});
-    envoyerCodeParEmail(info, code, '⭐ Full premium — 450 € (Audit expert sur site + Documents)');
-    alert('✅ Code DOCUMENTS créé pour Full Premium : '+code+'\n\n📋 Ce code donne accès aux documents uniquement.\n🧪 L\'audit sera réalisé par nos experts sur site.\n\n' + (info.email ? '📧 Email envoyé à : '+info.email : 'Aucun email — transmettez le code manuellement.'));
-    showAdminChoix();
+    finaliserCreationCode(nouveauCode, { label:'DOCUMENTS (Full Premium)', emailLabel:'⭐ Full premium — 450 € (Audit expert sur site + Documents)', extra:'📋 Ce code donne accès aux documents uniquement.\n🧪 L\'audit sera réalisé par nos experts sur site.', showChoix:true });
     return;
   }
 
@@ -4183,14 +4205,12 @@ function creerCodeFullSeulement(typeService) {
   var prix = '350 €';
   var code = makeUniqueCode(makeFullCode);
   var codes = getCodes();
-  codes.unshift({ code:code, client:info.etab, info:info, type:'full', serviceType:codeType, docsUnlocked:true, exp:null, used:false, created:Date.now() });
+  var nouveauCode = { code:code, client:info.etab, info:info, type:'full', serviceType:codeType, docsUnlocked:true, exp:null, used:false, created:Date.now() };
+  codes.unshift(nouveauCode);
   saveCodes(codes);
-  if (navigator.clipboard) navigator.clipboard.writeText(code).catch(function(){});
   var serviceFullLabel = (codeType === 'full_admin') ? '⭐ Full premium — 450 €' : '🎯 Full client — 350 €';
-  envoyerCodeParEmail(info, code, serviceFullLabel);
   var label = codeType === 'full_admin' ? '⭐ Full premium (expert + docs) — 450 €' : '🎯 Full client (audit + docs) — 350 €';
-  alert('✅ Code Full généré : '+code+'\n\nCopié dans le presse-papier.\nTransmettez-le à : '+info.etab+'\n\n'+label);
-  showAdminChoix();
+  finaliserCreationCode(nouveauCode, { label:'Full', emailLabel:serviceFullLabel, extra:label, showChoix:true });
 }
 
 function genererCodeFullExistant(typeService) {
@@ -4253,8 +4273,10 @@ function creerEtAuditer() {
   var code = makeCode();
   while (codes.find(function(c){ return c.code===code; })) { code = makeCode(); }
   var exp = document.getElementById('newCodeExp').value;
-  var serviceType = document.getElementById('newCodeService') ? document.getElementById('newCodeService').value : 'audit_admin'; var isFullOrDocs = (serviceType === 'full_admin' || serviceType === 'full_client' || serviceType === 'docs'); codes.unshift({ code:code, client:info.etab, info:info, type:'audit', serviceType:serviceType, docsUnlocked:isFullOrDocs, exp:exp||null, used:false, created:Date.now() });
+  var serviceType = document.getElementById('newCodeService') ? document.getElementById('newCodeService').value : 'audit_admin'; var isFullOrDocs = (serviceType === 'full_admin' || serviceType === 'full_client' || serviceType === 'docs'); var nouveauCode = { code:code, client:info.etab, info:info, type:'audit', serviceType:serviceType, docsUnlocked:isFullOrDocs, exp:exp||null, used:false, created:Date.now() };
+  codes.unshift(nouveauCode);
   saveCodes(codes);
+  persistNewCode(nouveauCode); // synchroniser vers Supabase (file d'attente + retry)
   // Stocker dans la session pour pré-remplissage
   var sess = getSession();
   if (sess) { sess.auditClientInfo = info; setSession(sess); }
@@ -4269,12 +4291,10 @@ function creerCodeSeulement() {
   var code = makeCode();
   while (codes.find(function(c){ return c.code===code; })) { code = makeCode(); }
   var exp = document.getElementById('newCodeExp').value;
-  codes.unshift({ code:code, client:info.etab, info:info, type:'audit', serviceType:'audit_client', docsUnlocked:false, exp:exp||null, used:false, created:Date.now() });
+  var nouveauCode = { code:code, client:info.etab, info:info, type:'audit', serviceType:'audit_client', docsUnlocked:false, exp:exp||null, used:false, created:Date.now() };
+  codes.unshift(nouveauCode);
   saveCodes(codes);
-  if (navigator.clipboard) navigator.clipboard.writeText(code).catch(function(){});
-  envoyerCodeParEmail(info, code, '🔑 Audit client — 200 €');
-  alert('✅ Code créé : '+code+'\n\nCopié dans le presse-papier.' + (info.email ? '\nEmail envoyé à : '+info.email : '\nAucun email renseigné — transmettez le code manuellement.'));
-  showAdminChoix();
+  finaliserCreationCode(nouveauCode, { emailLabel:'🔑 Audit client — 200 €', showChoix:true });
 }
 
 function collectNouveauClientForm() {
@@ -4662,13 +4682,12 @@ function genererNouveauCodeClient(ancienCode) {
   else if (type === 'full_client') newCode = makeUniqueCode(makeFullCode);
   else newCode = makeUniqueCode(makeCode);
   var docsUnlocked = (type === 'docs' || type === 'full_client' || type === 'full_admin');
-  codes.unshift({ code:newCode, client:c.client, info:c.info||{}, type:c.type, serviceType:type, docsUnlocked:docsUnlocked, exp:null, used:false, created:Date.now() });
+  var nouveauCode = { code:newCode, client:c.client, info:c.info||{}, type:c.type, serviceType:type, docsUnlocked:docsUnlocked, exp:null, used:false, created:Date.now() };
+  codes.unshift(nouveauCode);
   saveCodes(codes);
-  if (navigator.clipboard) navigator.clipboard.writeText(newCode).catch(function(){});
-  envoyerCodeParEmail(c.info||{}, newCode, labels[type]||type);
-  alert('✅ Nouveau code généré : ' + newCode + '\n' + (c.info&&c.info.email ? '📧 Email envoyé à : '+c.info.email : 'Transmettez le code manuellement.'));
-  refreshAdminTable();
-  refreshSuiviClientSelect();
+  finaliserCreationCode(nouveauCode, { label:(labels[type]||type), emailLabel:(labels[type]||type) }).then(function(){
+    refreshSuiviClientSelect();
+  });
 }
 
 function enregistrerConnexionClient(sess) {
@@ -7446,6 +7465,8 @@ function _genRapportWord(a, info) {
   var i = 0;
   var rowsSection = [];
   var enSection = false;
+  var started = false;     // ignorer l'en-tête (etab/score) deja rendu de maniere structuree
+  var brokeAtFDR = false;  // true si on s'arrete a la feuille de route (puis rendu structure)
 
   function flushSection() {
     if (rowsSection.length === 0) return;
@@ -7467,6 +7488,17 @@ function _genRapportWord(a, info) {
 
   while (i < lignes.length) {
     var l = lignes[i];
+
+    // Arret a la feuille de route : le reste (FDR, synthese, base reglementaire)
+    // est reconstruit de maniere structuree depuis le DOM (voir plus bas).
+    if (l.toUpperCase().indexOf("FEUILLE DE ROUTE") !== -1) { flushSection(); brokeAtFDR = true; break; }
+
+    // Ignorer l'en-tete (titre, fiche etablissement, score) deja rendu plus haut :
+    // on ne demarre le parsing texte qu'a la premiere section de chapitre "(xx%)".
+    if (!started) {
+      if (/\(\d+%\)/.test(l)) { started = true; }
+      else { i++; continue; }
+    }
 
     if (STATUTS_SEULS.indexOf(l) !== -1) { i++; continue; }
 
@@ -7509,6 +7541,96 @@ function _genRapportWord(a, info) {
     i++;
   }
   flushSection();
+
+  // ══ RENDU STRUCTURE (coherent avec le rapport PDF) ══
+  // Reconstruit depuis le DOM de rapport_html : feuille de route, synthese, base reglementaire.
+  if (brokeAtFDR) {
+    // Reperer les titres de sections restants
+    var narrTtl = null, regTtl = null;
+    var ttls = tmp.querySelectorAll(".rpt-sec-ttl");
+    for (var _t = 0; _t < ttls.length; _t++) {
+      var _tt = (ttls[_t].textContent || "").toUpperCase();
+      if (_tt.indexOf("NARRATIVE") !== -1) narrTtl = ttls[_t];
+      if (_tt.indexOf("BASE REGLEMENTAIRE") !== -1 || _tt.indexOf("BASE RÉGLEMENTAIRE") !== -1) regTtl = ttls[_t];
+    }
+
+    // ── 1) FEUILLE DE ROUTE — PLAN D'ACTION CORRECTIF (tableau structure) ──
+    children.push(vide());
+    children.push(bandeau("FEUILLE DE ROUTE - PLAN D'ACTION CORRECTIF", "b7410e"));
+    children.push(vide());
+    var fdrTable = tmp.querySelector("table.fdr");
+    var fdrRows = [];
+    if (fdrTable) {
+      var trs = fdrTable.querySelectorAll("tbody tr");
+      for (var _r = 0; _r < trs.length; _r++) {
+        var tds = trs[_r].querySelectorAll("td");
+        if (!tds.length) continue;
+        var prio = (tds[0] ? tds[0].textContent : "").trim();
+        var label = "", obs = "";
+        if (tds[1]) {
+          var st = tds[1].querySelector("strong");
+          label = st ? st.textContent.trim() : (tds[1].textContent || "").trim();
+          var em = tds[1].querySelector("em");
+          if (em) obs = em.textContent.replace(/^Obs\.?\s*:\s*/i, "").trim();
+        }
+        var point = label + (obs ? "  (Obs. : " + obs + ")" : "");
+        var action = (tds[2] ? tds[2].textContent : "").trim();
+        var delai  = (tds[3] ? tds[3].textContent : "").trim();
+        var resp   = (tds[4] ? tds[4].textContent : "").trim();
+        var reg    = (tds[5] ? tds[5].textContent : "").trim();
+        fdrRows.push([prio, point, action, delai, resp, reg]);
+      }
+    }
+    if (fdrRows.length) {
+      children.push(parag(fdrRows.length + " action(s) corrective(s) - classees par priorite.", {i:true, c:"65716b", sz:18}));
+      children.push(tableau(
+        ["Priorite", "Point de controle / Observation", "Action corrective", "Delai", "Responsable", "Reference reglementaire"],
+        fdrRows, [1080, 2560, 2380, 1080, 1120, 1418]
+      ));
+    } else {
+      children.push(parag("Aucune non-conformite relevee : aucune action corrective requise.", {b:true, c:"2d6f60"}));
+    }
+
+    // ── 2) SYNTHESE NARRATIVE DE L'AUDIT ──
+    if (narrTtl && narrTtl.nextElementSibling) {
+      children.push(vide());
+      children.push(bandeau("SYNTHESE NARRATIVE DE L'AUDIT", "1f5649"));
+      children.push(vide());
+      var nbox = narrTtl.nextElementSibling;
+      var nps = nbox.querySelectorAll("p, li");
+      if (nps.length) {
+        for (var _n = 0; _n < nps.length; _n++) {
+          var ntxt = (nps[_n].innerText || nps[_n].textContent || "").trim();
+          if (ntxt) children.push(parag((nps[_n].tagName === "LI" ? "•  " : "") + ntxt));
+        }
+      } else {
+        var nall = (nbox.innerText || nbox.textContent || "").trim();
+        if (nall) children.push(parag(nall));
+      }
+    }
+
+    // ── 3) BASE REGLEMENTAIRE & PRINCIPES HACCP ──
+    if (regTtl && regTtl.nextElementSibling) {
+      children.push(vide());
+      children.push(bandeau("BASE REGLEMENTAIRE & PRINCIPES HACCP", "1f5649"));
+      children.push(vide());
+      var rbox = regTtl.nextElementSibling;
+      var rkids = rbox.children;
+      for (var _c = 0; _c < rkids.length; _c++) {
+        var ch = rkids[_c];
+        if (ch.tagName === "UL" || ch.tagName === "OL") {
+          var lis = ch.querySelectorAll("li");
+          for (var _li = 0; _li < lis.length; _li++) {
+            var lt = (lis[_li].innerText || lis[_li].textContent || "").trim();
+            if (lt) children.push(parag("•  " + lt, {sz:18}));
+          }
+        } else {
+          var ct = (ch.innerText || ch.textContent || "").trim();
+          if (ct) children.push(parag(ct, {sz:18}));
+        }
+      }
+    }
+  }
 
   children.push(vide());
   children.push(new D.Paragraph({
