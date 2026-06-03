@@ -5645,28 +5645,41 @@ const TRONC_COMMUN = [
 
 const SPECIFIQUE = {
   RESTAURATION: [
-    { name: "PRODUCTION & MÉTHODE", items: [
-      { l: "Cuisson à cœur des viandes", w: 3, ref: "≥ +63°C à cœur", type: "temp" },
-      { l: "Cuisson à cœur des volailles", w: 3, ref: "≥ +74°C à cœur", type: "temp" },
-      { l: "Refroidissement rapide", w: 3, ref: "+63°C → +10°C à cœur en < 2h", type: "temp" },
-      { l: "Maintien en liaison chaude", w: 3, ref: "≥ +63°C", type: "temp" },
-      { l: "Liaison froide / plats préparés à l'avance", w: 3, ref: "≤ +4°C", type: "temp" },
-      { l: "Décongélation", w: 3, ref: "Au froid +4°C, datée, jamais recongelée" },
-      { l: "Sauces, fonds & préparations sensibles", w: 2, ref: "DLC courte, conservés à +4°C" },
-      { l: "Produits d'œuf cru (mayonnaise, mousses)", w: 3, ref: "Ovoproduits pasteurisés recommandés, +4°C" }
+    { name: "STRUCTURE & MARCHE EN AVANT", items: [
+      { l: "Sectorisation des zones (légumes / viande / poisson)", w: 3, ref: "Zones distinctes et identifiées par denrée" },
+      { l: "Isolation de la plonge", w: 2, ref: "Zone de lavage séparée des préparations" },
+      { l: "Zone de dépotage / déballage", w: 1, ref: "Retrait des cartons avant entrée en cuisine" },
+      { l: "Circuit vaisselle sale", w: 2, ref: "Va directement en plonge sans croiser le propre" }
     ]},
-    { name: "SERVICE, PRODUITS FINIS & INFO CLIENT", items: [
-      { l: "DLC des préparations maison", w: 3, ref: "3 jours max, étiquetées" },
-      { l: "Buffet / self : maintien des températures", w: 3, ref: "Chaud ≥ +63°C / froid ≤ +4°C", type: "temp" },
-      { l: "Plats témoins conservés (si collectivité)", w: 2, ref: "100 g / plat, +3°C, 5 jours" },
-      { l: "Huile de friture (si friture)", w: 2, ref: "Composés polaires ≤ 25%, changement tracé" },
-      { l: "Information allergènes accessible en salle", w: 3, ref: "Carte ou support écrit (INCO)" }
+    { name: "PRÉPARATION", items: [
+      { l: "Planches & code couleur", w: 3, ref: "Rouge viande / vert légumes / bleu poisson" },
+      { l: "DLC secondaires (produits entamés)", w: 3, ref: "Date de fab. + J+2/J+3 sur chaque bac ; sinon destruction" },
+      { l: "Décongélation", w: 3, ref: "Au froid +4°C max, sous film, fiche heure de sortie" },
+      { l: "Lavage & désinfection des légumes crus", w: 2, ref: "Eau potable + désinfectant alimentaire" },
+      { l: "Poste de lavage des mains dédié", w: 3, ref: "Eau chaude, savon bactéricide, essuie-mains jetables, dégagé" }
     ]},
-    { name: "MATÉRIEL DE CUISINE", items: [
-      { l: "Trancheuse / coupe-légumes", w: 2, ref: "Démontée et désinfectée après usage" },
-      { l: "Robot / cutter / batteur", w: 2, ref: "Propre, sans résidus, joints sains" },
-      { l: "Cellule de refroidissement rapide", w: 2, ref: "Fonctionnelle, sonde à cœur" },
-      { l: "Friteuse / plaques / fours", w: 1, ref: "Propres, sans dépôts carbonisés" }
+    { name: "CUISSON & GRILLADES", items: [
+      { l: "Cuisson à cœur (volaille, viande hachée, grillades)", w: 3, ref: "≥ +70°C à cœur ; sonde propre et étalonnée", type: "temp" },
+      { l: "Refroidissement rapide", w: 3, ref: "+63°C → +10°C en < 2h (cellule ou bain de glace)", type: "temp" },
+      { l: "Maintien au chaud (tajines, couscous, sauces)", w: 3, ref: "≥ +63°C", type: "temp" },
+      { l: "Huiles de friture", w: 2, ref: "Composés polaires < 25%, huile claire, test bandelette" },
+      { l: "Gestion des huiles usagées", w: 2, ref: "Fûts hermétiques identifiés + contrat de collecte agréé" }
+    ]},
+    { name: "FOCUS POISSON / PRODUITS DE LA MER", items: [
+      { l: "Contenant poisson (drainage exsudat)", w: 2, ref: "Caissettes perforées emboîtées dans un bac plein, en bas du frigo" },
+      { l: "Marquage décongélation poisson", w: 2, ref: "Heure de sortie du froid + DLC recalculée" },
+      { l: "Fraîcheur / conservation sous glace", w: 2, ref: "Poisson sur glace, jamais baignant dans son jus" }
+    ]},
+    { name: "SERVICE EN SALLE", items: [
+      { l: "Tenue du serveur", w: 1, ref: "Propre, dédiée, cheveux attachés (pas de vêtements de ville)" },
+      { l: "Hygiène des mains du serveur", w: 2, ref: "Lavage après avoir débarrassé la vaisselle sale" },
+      { l: "Aucun contact direct des mains avec les aliments", w: 2, ref: "Pince / papier ; jamais les doigts dans les plats" },
+      { l: "Stockage vaisselle propre", w: 1, ref: "Empilée à l'envers ou en placard fermé, à l'abri des projections" },
+      { l: "Zone de circulation serveur / passe-plat", w: 1, ref: "Serveur en zone service ; plats transmis via passe-plat" }
+    ]},
+    { name: "SALLE & SANITAIRES", items: [
+      { l: "Ventilation / VMC salle", w: 1, ref: "Grilles propres, sans poussière grasse" },
+      { l: "Sanitaires clients", w: 1, ref: "Savon liquide, papier jetable, propreté irréprochable" }
     ]}
   ],
   RESTAURATION_RAPIDE: [
