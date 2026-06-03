@@ -633,6 +633,17 @@ body{background:#fff}
         </div>
       </div>
 
+      <!-- Sauvegarde / Restauration -->
+      <div style="margin-bottom:16px;background:#fff8e1;border:1px solid rgba(183,144,41,.35);border-radius:12px;padding:14px">
+        <label style="font-size:.82rem;font-weight:700;color:#153e35;display:block;margin-bottom:4px">🛡️ Sauvegarde des données (clients + historique)</label>
+        <div style="font-size:.74rem;color:#65716b;line-height:1.5;margin-bottom:10px">Exportez régulièrement un fichier de sauvegarde et conservez-le. Après une réinstallation ou un changement d'appareil, réimportez-le pour tout récupérer.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="exportBackup()" style="flex:1;min-width:150px;padding:10px 14px;background:linear-gradient(135deg,#2d6f60,#153e35);color:#fff;border:none;border-radius:999px;cursor:pointer;font-weight:700;font-size:.85rem;font-family:'Source Sans 3',sans-serif">💾 Exporter la sauvegarde</button>
+          <button onclick="document.getElementById('restoreFile').click()" style="flex:1;min-width:150px;padding:10px 14px;background:#fff;color:#153e35;border:1.5px solid #2d6f60;border-radius:999px;cursor:pointer;font-weight:700;font-size:.85rem;font-family:'Source Sans 3',sans-serif">📥 Restaurer un fichier</button>
+        </div>
+        <input type="file" id="restoreFile" accept="application/json,.json" style="display:none" onchange="importBackup(this)">
+      </div>
+
       <div id="profile_msg" style="display:none;padding:10px;border-radius:8px;font-size:.84rem;margin-top:8px"></div>
     </div>
     <div style="padding:14px 24px;border-top:1px solid #dfe6e0;background:#f9f8f4">
@@ -3438,6 +3449,57 @@ function showProfileMsg(text, type) {
   setTimeout(function() { msg.style.display = 'none'; }, 3000);
 }
 
+// ── Sauvegarde / Restauration des données locales (clients + historique) ──
+function countBackupClients(data) {
+  try { return JSON.parse((data && data['haccp_codes']) || '[]').length; } catch(e) { return 0; }
+}
+function exportBackup() {
+  try {
+    var data = {};
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      data[k] = localStorage.getItem(k);
+    }
+    var payload = { app: 'ExpertAudit HACCP', version: '3bis', date: new Date().toISOString(), data: data };
+    var blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+    var name = 'sauvegarde-haccp-' + new Date().toISOString().slice(0, 10) + '.json';
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
+    var n = countBackupClients(data);
+    var nh = 0; try { nh = JSON.parse(data['hh'] || '[]').length; } catch(e) {}
+    showProfileMsg('✅ Sauvegarde téléchargée (' + n + ' client(s), ' + nh + ' audit(s)) : ' + name, 'ok');
+    if (typeof toast === 'function') toast('✅ Sauvegarde exportée.', 'ok');
+  } catch (e) {
+    showProfileMsg('❌ Erreur lors de l\'export : ' + e.message, 'err');
+  }
+}
+function importBackup(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      var payload = JSON.parse(ev.target.result);
+      var data = (payload && payload.data && typeof payload.data === 'object') ? payload.data : payload;
+      if (!data || typeof data !== 'object') throw new Error('format non reconnu');
+      var n = countBackupClients(data);
+      if (!confirm('Restaurer cette sauvegarde (' + n + ' client(s)) ?\nLes données actuelles de cet appareil seront remplacées par celles du fichier.')) {
+        input.value = ''; return;
+      }
+      Object.keys(data).forEach(function(k) { try { localStorage.setItem(k, data[k]); } catch(e) {} });
+      alert('✅ Restauration réussie — ' + n + ' client(s) restauré(s).\nL\'application va se recharger.');
+      location.reload();
+    } catch (e) {
+      showProfileMsg('❌ Fichier de sauvegarde illisible : ' + e.message, 'err');
+    }
+    input.value = '';
+  };
+  reader.readAsText(file);
+}
+
 // ── Notification admin — nouvelle demande reçue ──
 function envoyerNotifAdmin(adminEmail, d) {
   if (!adminEmail) return;
@@ -5336,28 +5398,28 @@ const SECTEURS = {
   ],
   BOULANGERIE: [
     { s: 1, name: "DOCUMENTS, CERTIFICATS & PMS", items: [
-      { l: "Plan de Maîtrise Sanitaire (PMS)", w: 3, ref: "Existant, à jour et appliqué" },
-      { l: "Déclaration d'activité (cerfa 13984 DDPP)", w: 3, ref: "À jour" },
-      { l: "Formation hygiène 14h / référent formé", w: 2, ref: "Attestation archivée" },
-      { l: "Analyses microbiologiques", w: 2, ref: "Bulletins selon plan d'autocontrôle" },
-      { l: "Conformité alimentaire des matériaux (tapis, rouleaux, bacs)", w: 2, ref: "Certificat disponible" },
-      { l: "Certificat de ramonage annuel (four / conduits)", w: 2, ref: "Annuel, archivé" },
-      { l: "Étalonnage des thermomètres / sondes", w: 2, ref: "Certificats valides" },
-      { l: "Attestation d'entretien des groupes froids", w: 2, ref: "Annuelle" },
-      { l: "Contrats & rapports : nuisibles, huiles usagées, biodéchets", w: 2, ref: "Signés et à jour" },
-      { l: "Potabilité de l'eau (analyses si réseau privé)", w: 2, ref: "Conforme" },
-      { l: "Registres & enregistrements (T°, nettoyage, NC)", w: 2, ref: "Tenus et à jour" }
+      { l: "Plan de Maîtrise Sanitaire (PMS)", w: 3, ref: "Existant, à jour et appliqué", type: "doc" },
+      { l: "Déclaration d'activité (cerfa 13984 DDPP)", w: 3, ref: "À jour", type: "doc" },
+      { l: "Formation hygiène 14h / référent formé", w: 2, ref: "Attestation archivée", type: "doc" },
+      { l: "Analyses microbiologiques", w: 2, ref: "Bulletins selon plan d'autocontrôle", type: "doc" },
+      { l: "Conformité alimentaire des matériaux (tapis, rouleaux, bacs)", w: 2, ref: "Certificat disponible", type: "doc" },
+      { l: "Certificat de ramonage annuel (four / conduits)", w: 2, ref: "Annuel, archivé", type: "doc" },
+      { l: "Étalonnage des thermomètres / sondes", w: 2, ref: "Certificats valides", type: "doc" },
+      { l: "Attestation d'entretien des groupes froids", w: 2, ref: "Annuelle", type: "doc" },
+      { l: "Contrats & rapports : nuisibles, huiles usagées, biodéchets", w: 2, ref: "Signés et à jour", type: "doc" },
+      { l: "Potabilité de l'eau (analyses si réseau privé)", w: 2, ref: "Conforme", type: "doc" },
+      { l: "Registres & enregistrements (T°, nettoyage, NC)", w: 2, ref: "Tenus et à jour", type: "doc" }
     ]},
     { s: 2, name: "MOYENS DE CONTRÔLE & AUTOSURVEILLANCE", items: [
-      { l: "Thermomètre à sonde", w: 3, ref: "Présent, fonctionnel, étalonné" },
-      { l: "Sonde à cœur (cuisson + refroidissement)", w: 3, ref: "Présente et étalonnée" },
-      { l: "Thermomètre dans chaque enceinte froide", w: 2, ref: "Présent et lisible" },
-      { l: "Thermomètre d'ambiance chambre de pousse", w: 1, ref: "Présent" },
-      { l: "Testeur / bandelettes composés polaires (huile)", w: 2, ref: "Disponible si friture" },
-      { l: "Minuteur / horloge pour les barèmes de temps", w: 1, ref: "Disponible" },
-      { l: "Système de datage des DLC (étiqueteuse)", w: 2, ref: "Opérationnel" },
-      { l: "Bacs alimentaires propres et identifiés", w: 2, ref: "En nombre suffisant" },
-      { l: "Registres vierges & classeur allergènes prêts", w: 2, ref: "Disponibles" }
+      { l: "Thermomètre à sonde", w: 3, ref: "Présent, fonctionnel, étalonné", type: "doc" },
+      { l: "Sonde à cœur (cuisson + refroidissement)", w: 3, ref: "Présente et étalonnée", type: "doc" },
+      { l: "Thermomètre dans chaque enceinte froide", w: 2, ref: "Présent et lisible", type: "doc" },
+      { l: "Thermomètre d'ambiance chambre de pousse", w: 1, ref: "Présent", type: "doc" },
+      { l: "Testeur / bandelettes composés polaires (huile)", w: 2, ref: "Disponible si friture", type: "doc" },
+      { l: "Minuteur / horloge pour les barèmes de temps", w: 1, ref: "Disponible", type: "doc" },
+      { l: "Système de datage des DLC (étiqueteuse)", w: 2, ref: "Opérationnel", type: "doc" },
+      { l: "Bacs alimentaires propres et identifiés", w: 2, ref: "En nombre suffisant", type: "doc" },
+      { l: "Registres vierges & classeur allergènes prêts", w: 2, ref: "Disponibles", type: "doc" }
     ]},
     { s: 3, name: "LOCAUX, MILIEU & MARCHE EN AVANT", items: [
       { l: "Sols / murs / plafonds", w: 2, ref: "Lessivables, sans moisissure ni écaillage" },
@@ -5550,9 +5612,15 @@ function switchSecteur() {
       html += '<select class="asel" onchange="onChange(this)">';
       html += '<option value="">- Evaluer -</option>';
       html += '<option value="na">N/A</option>';
-      html += '<option value="3">A - Conforme</option>';
-      html += '<option value="1">B - A ameliorer</option>';
-      html += '<option value="0">C - Non conforme</option>';
+      if (item.type === 'doc') {
+        html += '<option value="3">Présent / conforme</option>';
+        html += '<option value="1">Incomplet / à régulariser</option>';
+        html += '<option value="0">Absent / inexistant</option>';
+      } else {
+        html += '<option value="3">A - Conforme</option>';
+        html += '<option value="1">B - A ameliorer</option>';
+        html += '<option value="0">C - Non conforme</option>';
+      }
       html += '</select>';
       html += '<button class="nb" onclick="toggleNote(this)">&#9998;</button>';
       html += '</td></tr>';
@@ -5849,24 +5917,78 @@ function genRapport() {
       rBody += '</tbody></table>';
     }
 
-    rBody += '<div class="rpt-sec-ttl">PLAN D\'ACTION ET RECOMMANDATIONS</div>';
-    for (var ri2 = 0; ri2 < rows.length; ri2++) {
-      var row2 = rows[ri2];
-      var l2 = row2.dataset.l;
-      var v2 = row2.querySelector('.asel').value;
-      var reco = RCO[l2];
-      if (reco && (v2 === '0' || v2 === '1')) {
-        var isNC = v2 === '0';
-        var parts = (isNC ? reco.nc : reco.ab).split('|');
-        var txt = parts[0] || '';
-        var delai = parts[1] || '';
-        var prio = parts[2] || '';
-        rBody += '<div class="reco ' + (isNC ? 'reco-nc' : 'reco-ab') + '">';
-        rBody += '<div class="reco-lbl">' + (isNC ? 'NC' : 'AB') + ' : ' + l2 + '</div>';
-        rBody += '<div class="reco-txt">' + txt + '</div>';
-        rBody += '<div class="reco-delai">' + prio + ' - Delai : ' + delai + '</div>';
-        rBody += '</div>';
+    // ── FEUILLE DE ROUTE — PLAN D'ACTION CORRECTIF (toutes NC / à améliorer) ──
+    var _refMap = {};
+    for (var _qi = 0; _qi < questions.length; _qi++) {
+      var _secq = questions[_qi];
+      for (var _ii = 0; _ii < _secq.items.length; _ii++) {
+        var _itq = _secq.items[_ii];
+        _refMap[_itq.l] = { ref: _itq.ref || '', type: _itq.type || '', s: _secq.s, name: _secq.name };
       }
+    }
+    var _REGCHAP = {
+      1:"Regl. (CE) 852/2004 art.5 (PMS/HACCP) - Code rural L.233-4 (formation 14h)",
+      2:"Regl. (CE) 852/2004 Ann.II - Arrete 21/12/2009 (temperatures)",
+      3:"Regl. (CE) 852/2004 Ann.II ch. I-II (locaux, marche en avant)",
+      4:"Regl. (CE) 852/2004 Ann.II ch. VIII (hygiene du personnel)",
+      5:"Regl. (CE) 178/2002 (tracabilite) - Arrete 21/12/2009 (T receptions)",
+      6:"Regl. (CE) 852/2004 - Regl. (CE) 178/2002 (tracabilite)",
+      7:"Regl. (CE) 178/2002 art.18 (tracabilite) - Regl. (CE) 853/2004 (estampille)",
+      8:"Arrete 21/12/2009 (T conservation) - Regl. (CE) 852/2004 Ann.II ch. IX",
+      9:"Regl. (CE) 852/2004 Ann.II ch. V - Regl. (CE) 1935/2004 (contact alimentaire)",
+      10:"Arrete 08/10/2013 (refroidissement) - Regl. (CE) 2073/2005 (microbio) - CCP HACCP",
+      11:"Regl. (UE) 1169/2011 (INCO/allergenes) - Arrete 09/08/1978 (prix du pain)",
+      12:"Regl. (CE) 852/2004 Ann.II ch. I-II (nettoyage-desinfection)",
+      13:"Regl. (CE) 852/2004 Ann.II ch. IX (lutte contre les nuisibles)",
+      14:"Regl. (CE) 852/2004 Ann.II ch. VI - Loi AGEC (biodechets)",
+      15:"Regl. (CE) 852/2004 - Regl. (CE) 1935/2004 (materiaux au contact)"
+    };
+    function _regFor(sn){ return (secteur === 'BOULANGERIE' && _REGCHAP[sn]) ? _REGCHAP[sn] : 'Regl. (CE) 852/2004 - Hygiene des denrees alimentaires'; }
+    function _delaiFor(w){ return w === 3 ? 'Immediat - 48 h' : w === 2 ? '7 a 15 jours' : 'Sous 1 mois'; }
+    function _prioFor(w){ return w === 3 ? 'CRITIQUE' : w === 2 ? 'MAJEUR' : 'MINEUR'; }
+    function _prioColor(w){ return w === 3 ? '#e05252' : w === 2 ? '#e8913a' : '#b79029'; }
+    function _respFor(w){ return w === 3 ? 'Gerant / Responsable' : 'Referent hygiene'; }
+    var _roadmap = [];
+    for (var _r3 = 0; _r3 < rows.length; _r3++) {
+      var _row3 = rows[_r3];
+      var _v3 = _row3.querySelector('.asel').value;
+      if (_v3 !== '0' && _v3 !== '1') continue;
+      var _l3 = _row3.dataset.l;
+      var _w3 = parseInt(_row3.dataset.w) || 1;
+      var _s3 = parseInt(_row3.dataset.s) || 0;
+      var _meta = _refMap[_l3] || {};
+      var _note = '';
+      var _nrEl = _row3.nextElementSibling;
+      if (_nrEl) { var _ta = _nrEl.querySelector('textarea'); if (_ta) _note = (_ta.value || '').trim(); }
+      var _reco = RCO[_l3];
+      var _action = '';
+      if (_reco) { var _pp = (_v3 === '0' ? _reco.nc : _reco.ab).split('|'); _action = _pp[0] || ''; }
+      if (!_action) {
+        var _isDoc = _meta.type === 'doc';
+        if (_v3 === '0') _action = _isDoc ? ('Etablir / fournir et tenir a jour : ' + _l3 + (_meta.ref ? ' (exige : ' + _meta.ref + ')' : '')) : ('Mettre en conformite' + (_meta.ref ? ' - exigence : ' + _meta.ref : '') + '.');
+        else _action = 'Ameliorer / fiabiliser' + (_meta.ref ? ' - exigence : ' + _meta.ref : '') + '.';
+      }
+      _roadmap.push({ l:_l3, w:_w3, v:_v3, note:_note, action:_action, reg:_regFor(_s3), delai:_delaiFor(_w3), prio:_prioFor(_w3), col:_prioColor(_w3), resp:_respFor(_w3) });
+    }
+    _roadmap.sort(function(a,b){ return (b.w - a.w) || ((a.v==='0'?0:1) - (b.v==='0'?0:1)); });
+    rBody += '<div class="rpt-sec-ttl">FEUILLE DE ROUTE - PLAN D\'ACTION CORRECTIF</div>';
+    if (_roadmap.length === 0) {
+      rBody += '<p style="font-size:.86rem;color:#3aaa7a;padding:8px 0">Aucune non-conformite relevee : aucune action corrective requise.</p>';
+    } else {
+      rBody += '<p style="font-size:.78rem;color:#65716b;margin-bottom:8px">' + _roadmap.length + ' action(s) corrective(s) - classees par priorite.</p>';
+      rBody += '<table class="rpt-table fdr"><thead><tr><th>Priorite</th><th>Point controle / Observation</th><th>Action corrective</th><th>Delai</th><th>Responsable</th><th>Reference reglementaire</th></tr></thead><tbody>';
+      for (var _k = 0; _k < _roadmap.length; _k++) {
+        var _x = _roadmap[_k];
+        rBody += '<tr>'
+          + '<td style="white-space:nowrap;font-weight:700;color:' + _x.col + '">' + _x.prio + '</td>'
+          + '<td><strong>' + _x.l + '</strong>' + (_x.note ? '<br><em style="color:#65716b;font-size:.78rem">Obs. : ' + _x.note + '</em>' : '') + '</td>'
+          + '<td>' + _x.action + '</td>'
+          + '<td style="white-space:nowrap">' + _x.delai + '</td>'
+          + '<td style="white-space:nowrap">' + _x.resp + '</td>'
+          + '<td style="font-size:.72rem;color:#65716b">' + _x.reg + '</td>'
+          + '</tr>';
+      }
+      rBody += '</tbody></table>';
     }
 
     // ── RÉSUMÉ NARRATIF AUTOMATIQUE ──
@@ -5966,6 +6088,26 @@ function genRapport() {
     rBody += '</div>';
     // ── FIN RÉSUMÉ NARRATIF ──
 
+    rBody += '<div class="rpt-sec-ttl">BASE REGLEMENTAIRE &amp; PRINCIPES HACCP</div>';
+    rBody += '<div style="font-size:.8rem;line-height:1.8;color:#153e35;background:#f8fbff;border:1px solid #dfe6e0;border-radius:8px;padding:16px 20px;margin-bottom:20px">';
+    rBody += '<p style="margin-bottom:8px"><strong>Textes applicables :</strong></p>';
+    rBody += '<ul style="margin:0 0 10px 18px">'
+      + '<li>Regl. (CE) n.852/2004 - hygiene des denrees alimentaires (PMS, BPH, demarche HACCP)</li>'
+      + '<li>Regl. (CE) n.853/2004 - denrees d\'origine animale (estampille sanitaire)</li>'
+      + '<li>Regl. (CE) n.178/2002 - tracabilite / Food Law (art. 18)</li>'
+      + '<li>Regl. (UE) n.1169/2011 - information du consommateur / allergenes (INCO)</li>'
+      + '<li>Regl. (CE) n.2073/2005 - criteres microbiologiques</li>'
+      + '<li>Regl. (CE) n.1935/2004 - materiaux au contact des aliments</li>'
+      + '<li>Arrete du 21/12/2009 - temperatures de conservation</li>'
+      + '<li>Arrete du 08/10/2013 - refroidissement rapide</li>'
+      + '<li>Arrete du 09/08/1978 - affichage du prix du pain</li>'
+      + '<li>Loi AGEC - tri a la source des biodechets</li>'
+      + '<li>Code rural art. L.233-4 - formation hygiene obligatoire (14 h)</li>'
+      + '</ul>';
+    rBody += '<p style="margin-bottom:6px"><strong>7 principes HACCP :</strong> 1) analyse des dangers - 2) identification des CCP - 3) limites critiques - 4) surveillance - 5) actions correctives - 6) verification - 7) documentation &amp; enregistrements.</p>';
+    rBody += '<p><strong>CCP cles en boulangerie-patisserie :</strong> pasteurisation des cremes a coeur &gt;= 82 C - refroidissement rapide +63 a +10 C en moins de 2 h - chaine du froid 0 a +4 C - surgelation &lt;= -18 C - maitrise des allergenes (INCO).</p>';
+    rBody += '</div>';
+
     rBody += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px">';
     rBody += '<div style="border:1px solid #dfe6e0;padding:14px;border-radius:10px">';
     rBody += '<div style="font-size:0.7rem;color:#65716b;margin-bottom:6px">Signature Auditeur - ' + auditeur + '</div>';
@@ -6039,6 +6181,9 @@ function printRpt() {
   win.document.write('.rpt-table th{background:#f5f2ea;padding:8px 12px;text-align:left;font-size:.71rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#65716b;border-bottom:2px solid #dfe6e0}');
   win.document.write('.rpt-table td{padding:9px 12px;border-bottom:1px solid #dfe6e0;font-size:.83rem;vertical-align:middle}');
   win.document.write('.rpt-table tr:last-child td{border-bottom:none}');
+  win.document.write('.fdr th,.fdr td{font-size:.74rem;padding:6px 8px;vertical-align:top}');
+  win.document.write('.fdr td{border:1px solid #e2e8f0}');
+  win.document.write('@media print{.fdr{font-size:.7rem} .fdr th,.fdr td{padding:4px 6px}}');
   win.document.write('.reco{border-radius:8px;padding:12px 15px;margin-bottom:8px;border-left:4px solid transparent}');
   win.document.write('.reco-lbl{font-weight:600;font-size:.85rem;margin-bottom:5px}');
   win.document.write('.reco-txt{font-size:.82rem;color:#3a4a5c;line-height:1.6;margin-bottom:6px}');
