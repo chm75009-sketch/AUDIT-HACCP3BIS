@@ -33,6 +33,8 @@ if ('serviceWorker' in navigator) {
   }
   function showInstallBtn() {
     if (!document.body) { document.addEventListener('DOMContentLoaded', showInstallBtn); return; }
+    // Firefox (PC) ne sait pas installer de PWA → ne pas afficher de bouton trompeur
+    if (/Firefox\//.test(navigator.userAgent || '') && !/Seamonkey/.test(navigator.userAgent || '')) return;
     if (isInstalled() || document.getElementById('pwaInstallBtn')) return;
     var b = document.createElement('button');
     b.id = 'pwaInstallBtn';

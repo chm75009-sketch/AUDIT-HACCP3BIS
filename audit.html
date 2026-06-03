@@ -34,6 +34,8 @@ if ('serviceWorker' in navigator) {
   }
   function showInstallBtn() {
     if (!document.body) { document.addEventListener('DOMContentLoaded', showInstallBtn); return; }
+    // Firefox (PC) ne sait pas installer de PWA → ne pas afficher de bouton trompeur
+    if (/Firefox\//.test(navigator.userAgent || '') && !/Seamonkey/.test(navigator.userAgent || '')) return;
     if (isInstalled() || document.getElementById('pwaInstallBtn')) return;
     var b = document.createElement('button');
     b.id = 'pwaInstallBtn';
@@ -4497,14 +4499,73 @@ function auditLibre() {
   // Nettoyer un éventuel bandeau client résiduel
   var bar = document.getElementById('clientInfoBar'); if (bar) bar.remove();
   showApp('admin');
-  // Laisser les champs établissement/responsable/auditeur vides et éditables
+  // Laisser les champs établissement/responsable/auditeur vides et éditables + injecter le sélecteur clients
   setTimeout(function() {
     ['m-etab','m-resp','m-aud'].forEach(function(id){
       var el = document.getElementById(id);
       if (el) { el.removeAttribute('readonly'); el.style.background=''; el.style.color=''; el.style.cursor=''; }
     });
-    if (typeof toast === 'function') toast('📝 Audit libre — renseignez librement les informations.', 'inf');
+    injectLibreClientPicker();
+    if (typeof toast === 'function') toast('📝 Audit libre — saisie libre, ou chargez un client existant ci-dessus.', 'inf');
   }, 450);
+}
+
+// Liste dédupliquée des clients existants (depuis les codes), pour les sélecteurs
+function _uniqueClients() {
+  var seen = {}, list = [];
+  getCodes().filter(function(c){ return c.type !== 'admin_temp'; }).forEach(function(c) {
+    var nom = (c.info && c.info.etab && c.info.etab.trim()) ? c.info.etab.trim() : (c.client || '').trim();
+    if (!nom) return;
+    var key = nom.toLowerCase();
+    if (!seen[key]) { seen[key] = true; list.push(c); }
+  });
+  return list;
+}
+
+// Injecte un sélecteur « charger un client existant » en haut du formulaire d'audit libre
+function injectLibreClientPicker() {
+  var metaEl = document.querySelector('#auditDoc .meta') || document.querySelector('.meta');
+  if (!metaEl) return;
+  var old = document.getElementById('libreClientPicker'); if (old) old.remove();
+  var clients = _uniqueClients();
+  var bar = document.createElement('div');
+  bar.id = 'libreClientPicker';
+  bar.style.cssText = 'background:#f0faf8;border:1px solid rgba(0,168,150,.3);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap';
+  var html = '<span style="font-size:.82rem;color:#00796b;font-weight:700;white-space:nowrap">👥 Client existant :</span>';
+  html += '<select id="libre_client_sel" onchange="onLibreClientPick(this.value)" style="flex:1;min-width:200px;padding:8px 10px;border:1.5px solid #dfe6e0;border-radius:7px;font-family:\'Source Sans 3\',sans-serif;font-size:.85rem;background:#fff">';
+  html += '<option value="">— Saisie libre (aucun client) —</option>';
+  clients.forEach(function(c, i){
+    var nom = (c.info && c.info.etab && c.info.etab.trim()) ? c.info.etab.trim() : (c.client || '').trim();
+    html += '<option value="' + i + '">' + nom + '</option>';
+  });
+  html += '</select>';
+  html += '<span style="font-size:.74rem;color:#65716b">Optionnel — pré-remplit la fiche, champs restent modifiables</span>';
+  bar.innerHTML = html;
+  metaEl.parentNode.insertBefore(bar, metaEl);
+  var selEl = document.getElementById('libre_client_sel');
+  if (selEl) selEl._clients = clients;
+}
+
+// Charge (ou non) un client existant dans le formulaire d'audit libre
+function onLibreClientPick(val) {
+  var selEl = document.getElementById('libre_client_sel');
+  var sess = getSession();
+  if (val === '' || !selEl || !selEl._clients) {
+    if (sess) { delete sess.auditClientInfo; setSession(sess); }
+    return;
+  }
+  var c = selEl._clients[parseInt(val)];
+  if (!c) return;
+  var info = c.info || {};
+  if (!info.etab) info = Object.assign({}, info, { etab: c.client || '' });
+  if (sess) { sess.auditClientInfo = info; setSession(sess); }
+  var set = function(id, v){ var el = document.getElementById(id); if (el && v != null) el.value = v; };
+  if (info.secteur) { var mt = document.getElementById('m-type'); if (mt) { mt.value = info.secteur; if (typeof switchSecteur === 'function') switchSecteur(); } }
+  set('m-etab', info.etab || c.client || '');
+  set('m-resp', info.resp || '');
+  set('m-aud',  info.auditeur || '');
+  if (info.visite) set('m-vis', info.visite);
+  if (typeof toast === 'function') toast('👥 Client « ' + (info.etab || c.client) + ' » chargé — modifiable.', 'ok');
 }
 
 // ── Afficher l'application audit ──
