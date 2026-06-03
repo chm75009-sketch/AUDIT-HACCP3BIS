@@ -2825,24 +2825,38 @@ function saveDemandes(d) {
 }
 function saveDemande_remote(demande) {
   // Envoie UNE demande vers Supabase (insert)
+  var payload = {
+    resp: demande.resp,
+    etab: demande.etab,
+    secteur: demande.secteur,
+    service: demande.service,
+    tel: demande.tel,
+    email: demande.email,
+    adresse: demande.adresse || '',
+    siret: demande.siret || '',
+    effectif: demande.effectif || '',
+    message: demande.message || '',
+    date: demande.date,
+    statut: 'nouveau'
+  };
+  var key = (demande.email || '') + '|' + (demande.date || '') + '|' + (demande.etab || '');
   return fetch(SUPABASE_URL + '/rest/v1/demandes', {
     method: 'POST',
     headers: Object.assign({}, sbHeaders(), { 'Prefer': 'return=representation' }),
-    body: JSON.stringify({
-      resp: demande.resp,
-      etab: demande.etab,
-      secteur: demande.secteur,
-      service: demande.service,
-      tel: demande.tel,
-      email: demande.email,
-      adresse: demande.adresse || '',
-      siret: demande.siret || '',
-      effectif: demande.effectif || '',
-      message: demande.message || '',
-      date: demande.date,
-      statut: 'nouveau'
-    })
-  }).then(function(r){ return r.json(); });
+    body: JSON.stringify(payload)
+  }).then(function(r) {
+    if (r.ok || r.status === 409) {
+      dropOutbox('demande', key);
+      flushOutbox();
+      return r.json().catch(function(){ return null; });
+    }
+    if (typeof toast === 'function') toast('⚠️ Demande refusée par le serveur (erreur ' + r.status + '). Conservée en local.', 'err');
+    return null;
+  }, function(netErr) {
+    enqueueOutbox('demande', key, payload);
+    if (typeof toast === 'function') toast('⚠️ Hors ligne : demande enregistrée en local seulement. Synchronisation automatique au retour du réseau.', 'err');
+    throw netErr;
+  });
 }
 function fetchDemandes_remote() {
   return fetch(SUPABASE_URL + '/rest/v1/demandes?order=id.desc', {
@@ -2884,20 +2898,35 @@ function saveCodes(c) {
   localStorage.setItem(CODES_KEY, JSON.stringify(c));
 }
 function saveCode_remote(codeObj) {
+  var payload = {
+    code: codeObj.code,
+    client: codeObj.client,
+    info: JSON.stringify(codeObj.info || {}),
+    type: codeObj.type || null,
+    service_type: codeObj.serviceType || null,
+    docs_unlocked: codeObj.docsUnlocked || false,
+    exp: codeObj.exp || null,
+    used: codeObj.used || false
+  };
   return fetch(SUPABASE_URL + '/rest/v1/codes', {
     method: 'POST',
     headers: Object.assign({}, sbHeaders(), { 'Prefer': 'return=representation' }),
-    body: JSON.stringify({
-      code: codeObj.code,
-      client: codeObj.client,
-      info: JSON.stringify(codeObj.info || {}),
-      type: codeObj.type || null,
-      service_type: codeObj.serviceType || null,
-      docs_unlocked: codeObj.docsUnlocked || false,
-      exp: codeObj.exp || null,
-      used: codeObj.used || false
-    })
-  }).then(function(r){ return r.json(); });
+    body: JSON.stringify(payload)
+  }).then(function(r) {
+    // Serveur joignable
+    if (r.ok || r.status === 409) {                 // 409 = déjà présent → OK
+      dropOutbox('code', codeObj.code);
+      flushOutbox();                                 // en profite pour vider la file
+      return r.json().catch(function(){ return null; });
+    }
+    if (typeof toast === 'function') toast('⚠️ Enregistrement cloud refusé (erreur ' + r.status + '). Client conservé en local.', 'err');
+    return null;
+  }, function(netErr) {
+    // Échec réseau (hors-ligne) : file d'attente + re-tentative auto
+    enqueueOutbox('code', codeObj.code, payload);
+    if (typeof toast === 'function') toast('⚠️ Hors ligne : client enregistré en local seulement. Synchronisation automatique dès le retour du réseau.', 'err');
+    throw netErr;
+  });
 }
 function fetchCodes_remote() {
   return fetch(SUPABASE_URL + '/rest/v1/codes?order=created_at.desc', {
@@ -2937,16 +2966,108 @@ function deleteCode_remote(code) {
 
 // ── Synchronisation au chargement admin ──
 function syncFromSupabase(callback) {
-  Promise.all([fetchDemandes_remote(), fetchCodes_remote()]).then(function(results) {
-    var demandes = results[0];
-    var codes = results[1];
-    saveDemandes(demandes);
-    saveCodes(codes);
-    if (callback) callback();
-  }).catch(function(err) {
-    console.error('Supabase sync error:', err);
-    if (callback) callback();
+  // Fiabilité : on POUSSE d'abord les enregistrements locaux en attente,
+  // SINON le fetch ci-dessous (qui écrase le local) ferait perdre les
+  // clients créés hors-ligne et non encore synchronisés.
+  flushOutbox(function() {
+    Promise.all([fetchDemandes_remote(), fetchCodes_remote()]).then(function(results) {
+      var demandes = results[0];
+      var codes = results[1];
+      saveDemandes(demandes);
+      saveCodes(codes);
+      updateSyncBadge();
+      if (callback) callback();
+    }).catch(function(err) {
+      console.error('Supabase sync error:', err);
+      updateSyncBadge();
+      if (callback) callback();
+    });
   });
+}
+
+// ════════════════════════════════════════════════════════════
+//  OUTBOX — fiabilisation de l'enregistrement (hors-ligne)
+//  Les clients (codes) / demandes qui n'ont pas pu partir vers
+//  Supabase sont stockés ici puis rejoués automatiquement au
+//  retour du réseau et à la connexion admin (=> plus de perte).
+// ════════════════════════════════════════════════════════════
+var OUTBOX_KEY = 'haccp_outbox_v1';
+function getOutbox() {
+  try { return JSON.parse(localStorage.getItem(OUTBOX_KEY) || '[]'); } catch(e) { return []; }
+}
+function saveOutbox(arr) {
+  try { localStorage.setItem(OUTBOX_KEY, JSON.stringify(arr)); } catch(e) {}
+}
+function enqueueOutbox(kind, key, payload) {
+  // dédoublonnage : un seul enregistrement en attente par (kind,key)
+  var ob = getOutbox().filter(function(e){ return !(e.kind === kind && e.key === key); });
+  ob.push({ kind: kind, key: key, payload: payload, ts: Date.now() });
+  saveOutbox(ob);
+  updateSyncBadge();
+}
+function dropOutbox(kind, key) {
+  var ob = getOutbox();
+  var keep = ob.filter(function(e){ return !(e.kind === kind && e.key === key); });
+  if (keep.length !== ob.length) { saveOutbox(keep); updateSyncBadge(); }
+}
+function _postOutbox(entry) {
+  var path = entry.kind === 'code' ? 'codes' : 'demandes';
+  return fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    method: 'POST',
+    headers: Object.assign({}, sbHeaders(), { 'Prefer': 'return=minimal' }),
+    body: JSON.stringify(entry.payload)
+  }).then(function(r) {
+    if (r.ok || r.status === 409) return true;   // envoyé (ou déjà présent) → terminé
+    throw new Error('HTTP ' + r.status);          // rejet serveur → on garde pour plus tard
+  });
+}
+function flushOutbox(cb) {
+  var ob = getOutbox();
+  if (!ob.length) { updateSyncBadge(); if (cb) cb(0); return; }
+  var remaining = [];
+  var chain = Promise.resolve();
+  ob.forEach(function(entry) {
+    chain = chain.then(function() {
+      return _postOutbox(entry).then(function(){ /* envoyé : on ne le garde pas */ },
+                                     function(){ remaining.push(entry); /* échec : on réessaiera */ });
+    });
+  });
+  chain.then(function() {
+    saveOutbox(remaining);
+    updateSyncBadge();
+    var sent = ob.length - remaining.length;
+    if (sent > 0 && typeof toast === 'function') toast('✓ ' + sent + ' enregistrement(s) synchronisé(s) en ligne.', 'ok');
+    if (cb) cb(remaining.length);
+  });
+}
+function updateSyncBadge() {
+  var n = getOutbox().length;
+  var sess = (typeof getSession === 'function') ? getSession() : null;
+  var isAdmin = sess && sess.role === 'admin';
+  var el = document.getElementById('syncBadge');
+  // L'indicateur n'apparaît que pour l'admin et seulement s'il reste des éléments en attente
+  if (n === 0 || !isAdmin) { if (el && el.parentNode) el.parentNode.removeChild(el); return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'syncBadge';
+    el.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:99999;background:#b35900;color:#fff;font-family:\'Source Sans 3\',sans-serif;font-size:.8rem;padding:10px 14px;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.25);display:flex;align-items:center;gap:10px;max-width:320px';
+    document.body.appendChild(el);
+  }
+  el.textContent = '';
+  var span = document.createElement('span');
+  span.textContent = '⚠️ ' + n + ' enregistrement(s) non synchronisé(s)';
+  el.appendChild(span);
+  var btn = document.createElement('button');
+  btn.textContent = 'Synchroniser';
+  btn.style.cssText = 'background:#fff;color:#b35900;border:none;border-radius:7px;padding:6px 11px;font-weight:700;cursor:pointer;font-size:.78rem;font-family:inherit;white-space:nowrap';
+  btn.onclick = function() {
+    btn.disabled = true; btn.textContent = '…';
+    flushOutbox(function(left) {
+      btn.disabled = false; btn.textContent = 'Synchroniser';
+      if (left > 0 && typeof toast === 'function') toast('Toujours ' + left + ' non synchronisé(s) — vérifiez la connexion.', 'err');
+    });
+  };
+  el.appendChild(btn);
 }
 
 function getAdminPwd() {
@@ -7942,6 +8063,12 @@ function onAuditClientChange(sel) {
 }
 
 window.addEventListener('DOMContentLoaded', function() {
+  // Fiabilité réseau : rejouer la file d'attente au retour du réseau,
+  // et une fois au chargement (laisse le temps à la session de s'initialiser).
+  try {
+    window.addEventListener('online', function(){ flushOutbox(); });
+    setTimeout(function(){ if (navigator.onLine) flushOutbox(); else updateSyncBadge(); }, 1500);
+  } catch(e) {}
   // Vérifier session au chargement
   var sess = getSession();
   if (!sess) {
