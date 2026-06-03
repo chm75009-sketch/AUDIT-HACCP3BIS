@@ -5684,22 +5684,31 @@ const SPECIFIQUE = {
   ],
   RESTAURATION_RAPIDE: [
     { name: "PRODUCTION RAPIDE & CUISSON", items: [
-      { l: "Cuisson steaks hachés / viandes hachées", w: 3, ref: "≥ +65°C à cœur", type: "temp" },
+      { l: "Cuisson steaks hachés / viandes hachées", w: 3, ref: "≥ +65°C à cœur (risque E.coli)", type: "temp" },
       { l: "Cuisson volailles & produits panés", w: 3, ref: "≥ +74°C à cœur", type: "temp" },
-      { l: "Huile de friture", w: 2, ref: "T° ~175°C, composés polaires ≤ 25%, changement tracé", type: "temp" },
+      { l: "Maintien liaison chaude (lampe chauffante / bain-marie)", w: 3, ref: "≥ +63°C", type: "temp" },
       { l: "Refroidissement rapide", w: 3, ref: "+63°C → +10°C en < 2h", type: "temp" },
-      { l: "Maintien liaison chaude", w: 3, ref: "≥ +63°C", type: "temp" }
+      { l: "Décongélation", w: 3, ref: "Au froid +4°C ou cuisson directe ; jamais à l'air libre" },
+      { l: "Huile de friture", w: 2, ref: "T° ~175°C, composés polaires ≤ 25%, changement tracé", type: "temp" }
     ]},
-    { name: "SANDWICHS & PRODUITS FROIDS", items: [
+    { name: "SANDWICHS, ASSEMBLAGE & PRODUITS FROIDS", items: [
       { l: "Vitrine / meuble réfrigéré (produits froids)", w: 3, ref: "≤ +4°C", type: "temp" },
       { l: "DLC sandwichs / salades maison", w: 3, ref: "3 jours max, étiquetage complet" },
-      { l: "Assemblage à froid (poste propre, gants/pince)", w: 2, ref: "Pas de contact main nue" },
-      { l: "Gestion des invendus", w: 2, ref: "Retraits documentés en fin de service" }
+      { l: "Assemblage à froid (poste propre, gants / pince)", w: 2, ref: "Pas de contact main nue" },
+      { l: "Sauces & condiments", w: 2, ref: "DLC après ouverture respectée, conservés à +4°C" },
+      { l: "Crudités / garnitures fraîches", w: 2, ref: "Lavées, désinfectées, conservées au froid" },
+      { l: "Réassort des produits froids (FIFO)", w: 2, ref: "Rotation, pas de rupture de la chaîne du froid" }
     ]},
-    { name: "SERVICE & INFO CLIENT", items: [
-      { l: "Information allergènes (14) au comptoir", w: 3, ref: "Affichée et accessible (INCO)" },
+    { name: "SERVICE, DRIVE & LIVRAISON", items: [
       { l: "Drive / livraison : maintien T° et délais", w: 2, ref: "Chaud ≥ +63°C / froid ≤ +4°C", type: "temp" },
-      { l: "Emballages au contact alimentaire", w: 2, ref: "Conformes (Règl. 1935/2004)" }
+      { l: "Emballages au contact alimentaire", w: 2, ref: "Conformes (Règl. 1935/2004)" },
+      { l: "Gestion des invendus / DLC de service", w: 2, ref: "Retraits documentés en fin de service" },
+      { l: "Machine à boissons / glaçons", w: 2, ref: "Détartrée, désinfectée, eau potable" }
+    ]},
+    { name: "ÉQUIPEMENTS & INFO CLIENT", items: [
+      { l: "Grill / plancha / friteuse", w: 1, ref: "Propres, sans dépôts carbonisés" },
+      { l: "Toaster / micro-ondes / salamandre", w: 1, ref: "Propres, en bon état" },
+      { l: "Information allergènes (14) au comptoir / bornes", w: 3, ref: "Affichée, accessible, personnel informé (INCO)" }
     ]}
   ],
   BOUCHERIE: [
