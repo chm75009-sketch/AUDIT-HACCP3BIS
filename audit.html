@@ -1303,9 +1303,10 @@ body{background:#fff}
                 del.type = 'button'; del.className = 'photo-del'; del.textContent = '✕';
                 del.title = 'Supprimer cette photo';
                 del.style.cssText = 'position:absolute;top:-9px;right:-9px;width:28px;height:28px;border-radius:50%;background:#e05252;color:#fff;border:2px solid #fff;font-size:14px;font-weight:700;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.35);z-index:5;padding:0';
-                del.onclick = function(ev) { ev.stopPropagation(); if (confirm('Supprimer cette photo ?')) wrap.remove(); };
+                del.onclick = function(ev) { ev.stopPropagation(); if (confirm('Supprimer cette photo ?')) { wrap.remove(); if (typeof saveDraftDebounced === 'function') saveDraftDebounced(); } };
                 wrap.appendChild(img); wrap.appendChild(del);
                 cible.appendChild(wrap);
+                if (typeof saveDraftDebounced === 'function') saveDraftDebounced(); // brouillon : inclure la photo
                 if (typeof toast === 'function') toast('📷 Photo ajoutée — elle figurera dans le rapport.', 'ok');
                 else setTimeout(function(){ alert('✅ Photo enregistrée pour ce point — elle figurera dans le rapport.'); }, 30);
             });
@@ -4491,7 +4492,12 @@ function prefillNouveauClient() {
 // ── Audit libre (admin) : saisie libre, sans création ni envoi de code client ──
 function auditLibre() {
   var sess = getSession();
-  if (sess) { delete sess.auditClientInfo; setSession(sess); } // pas de client pré-rempli → champs libres
+  if (sess) {
+    delete sess.auditClientInfo; // pas de client pré-rempli → champs libres
+    // Identifiant de session pour permettre la REPRISE du brouillon même en audit libre
+    if (!sess.libreAuditId) sess.libreAuditId = 'L' + Date.now();
+    setSession(sess);
+  }
   // Nettoyer un éventuel bandeau client résiduel
   var bar = document.getElementById('clientInfoBar'); if (bar) bar.remove();
   showApp('admin');
@@ -6730,6 +6736,7 @@ function currentAuditKey() {
   if (sess.code) return 'code:' + sess.code;
   if (sess.auditClientInfo && sess.auditClientInfo.etab) return 'etab:' + sess.auditClientInfo.etab.trim().toLowerCase();
   if (sess.info && sess.info.etab) return 'etab:' + sess.info.etab.trim().toLowerCase();
+  if (sess.libreAuditId) return 'libre:' + sess.libreAuditId; // audit libre → clé de session dédiée
   return null;
 }
 function getDraft(key) {
@@ -6749,7 +6756,15 @@ function saveDraft() {
   var answered = sels.filter(function(v){ return v && v !== '' && v !== 'na'; }).length;
   var hasObs = (document.getElementById('obs1') && document.getElementById('obs1').value.trim()) ||
                (document.getElementById('obs2') && document.getElementById('obs2').value.trim());
-  if (!answered && !hasObs) return;
+  // Photos prises pendant l'audit (pour pouvoir les récupérer à la reprise)
+  var photos = [];
+  document.querySelectorAll('.ar').forEach(function(r){
+    var pl = r.getAttribute('data-l') || '';
+    r.querySelectorAll('img.photo-inseree').forEach(function(im){
+      photos.push({ p: pl, src: im.getAttribute('src') || '', w: im.getAttribute('data-w') || '', h: im.getAttribute('data-h') || '' });
+    });
+  });
+  if (!answered && !hasObs && !photos.length) return;
   var draft = {
     m: {
       etab: (document.getElementById('m-etab')||{}).value || '',
@@ -6762,9 +6777,16 @@ function saveDraft() {
     sels: sels, notes: notes,
     obs1: (document.getElementById('obs1')||{}).value || '',
     obs2: (document.getElementById('obs2')||{}).value || '',
+    photos: photos,
     savedAt: Date.now()
   };
-  try { localStorage.setItem(DRAFT_PREFIX + key, JSON.stringify(draft)); } catch(e){}
+  try {
+    localStorage.setItem(DRAFT_PREFIX + key, JSON.stringify(draft));
+  } catch(e) {
+    // Quota dépassé (photos volumineuses) : on sauvegarde au moins les réponses/observations
+    draft.photos = []; draft.photosOmises = photos.length;
+    try { localStorage.setItem(DRAFT_PREFIX + key, JSON.stringify(draft)); } catch(e2){}
+  }
 }
 function saveDraftDebounced() {
   if (_draftTimer) clearTimeout(_draftTimer);
@@ -6789,20 +6811,50 @@ function restoreDraft(d) {
       }
     });
     set('obs1', d.obs1 || ''); set('obs2', d.obs2 || '');
+    // Réinsérer les photos dans leurs points respectifs
+    if (d.photos && d.photos.length) {
+      var arRows = document.querySelectorAll('.ar');
+      var byLabel = {};
+      for (var ri = 0; ri < arRows.length; ri++) { byLabel[(arRows[ri].getAttribute('data-l') || '')] = arRows[ri]; }
+      d.photos.forEach(function(ph){
+        var row = byLabel[ph.p || ''];
+        if (!row || !ph.src) return;
+        var img = document.createElement('img');
+        img.className = 'photo-inseree'; img.src = ph.src;
+        if (ph.p) img.setAttribute('data-point', ph.p);
+        if (ph.w) img.setAttribute('data-w', ph.w);
+        if (ph.h) img.setAttribute('data-h', ph.h);
+        img.style.cssText = 'width:100%;display:block;margin:0;border:2px solid #153e35;border-radius:6px';
+        var wrap = document.createElement('div');
+        wrap.className = 'photo-wrap'; wrap.style.cssText = 'position:relative;width:200px;margin:10px auto';
+        var del = document.createElement('button');
+        del.type = 'button'; del.className = 'photo-del'; del.textContent = '✕'; del.title = 'Supprimer cette photo';
+        del.style.cssText = 'position:absolute;top:-9px;right:-9px;width:28px;height:28px;border-radius:50%;background:#e05252;color:#fff;border:2px solid #fff;font-size:14px;font-weight:700;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.35);z-index:5;padding:0';
+        del.onclick = function(ev){ ev.stopPropagation(); if (confirm('Supprimer cette photo ?')) wrap.remove(); };
+        wrap.appendChild(img); wrap.appendChild(del); row.appendChild(wrap);
+      });
+    }
     if (typeof calcScore === 'function') calcScore(); // réapplique aussi les couleurs des réponses
-    if (typeof toast === 'function') toast('🔄 Audit repris là où vous l\'aviez laissé.', 'ok');
+    var _ph = (d.photos && d.photos.length) ? (' (' + d.photos.length + ' photo' + (d.photos.length>1?'s':'') + ')') : (d.photosOmises ? ' (photos non récupérées — trop volumineuses)' : '');
+    if (typeof toast === 'function') toast('🔄 Audit repris là où vous l\'aviez laissé' + _ph + '.', 'ok');
   }, 350);
 }
 function maybeOfferDraftRecovery() {
   var key = currentAuditKey();
   if (!key) return;
   var d = getDraft(key);
-  if (!d || !d.sels) return;
-  var answered = d.sels.filter(function(v){ return v && v !== '' && v !== 'na'; }).length;
-  if (!answered) { clearDraft(key); return; }
+  if (!d) return;
+  var answered = (d.sels || []).filter(function(v){ return v && v !== '' && v !== 'na'; }).length;
+  var nbPhotos = (d.photos && d.photos.length) ? d.photos.length : (d.photosOmises || 0);
+  var hasObs = (d.obs1 && d.obs1.trim()) || (d.obs2 && d.obs2.trim());
+  if (!answered && !nbPhotos && !hasObs) { clearDraft(key); return; }
   var when = d.savedAt ? new Date(d.savedAt).toLocaleString('fr-FR') : '';
+  var detail = [];
+  if (answered) detail.push(answered + ' réponse(s)');
+  if (nbPhotos) detail.push(nbPhotos + ' photo(s)');
+  if (hasObs) detail.push('observations');
   var msg = '🔄 Un audit en cours a été trouvé pour ce client\n('
-          + answered + ' réponse(s), enregistré le ' + when + ').\n\n'
+          + detail.join(' · ') + ', enregistré le ' + when + ').\n\n'
           + 'Reprendre cet audit là où vous l\'avez laissé ?\n\n'
           + '• OK = Reprendre\n• Annuler = Recommencer à zéro';
   if (confirm(msg)) { restoreDraft(d); }
