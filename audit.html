@@ -867,6 +867,16 @@ body{background:#fff}
 
 
     <div class="admin-section">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <h2 style="margin:0"><span style="background:#153e35;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:.7rem">🗂️</span>&nbsp; Historique des audits</h2>
+        <button onclick="loadAudits_remote()" style="background:#fff;border:1px solid #dfe6e0;border-radius:8px;padding:7px 14px;font-family:'Source Sans 3',sans-serif;font-size:.8rem;color:#1f5649;font-weight:600;cursor:pointer">🔄 Actualiser</button>
+      </div>
+      <p style="font-size:.8rem;color:#65716b;margin:6px 0 12px">Audits enregistrés (cloud). Cliquez « 📋 Détail » pour consulter, modifier ou télécharger un rapport professionnel.</p>
+      <div id="auditsWrap"><div style="font-size:.82rem;color:#8a9e95;text-align:center;padding:16px">⏳ Chargement…</div></div>
+    </div>
+
+
+    <div class="admin-section">
       <h2><span style="background:#153e35;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:.7rem">🔐</span>&nbsp; Changer le mot de passe administrateur</h2>
         <div class="gen-field"><label>Nouveau mot de passe</label><input type="password" id="newPwd1" placeholder="Nouveau mot de passe"></div>
         <div class="gen-field"><label>Confirmer</label><input type="password" id="newPwd2" placeholder="Confirmer"></div>
