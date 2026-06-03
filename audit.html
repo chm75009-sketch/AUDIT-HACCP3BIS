@@ -693,6 +693,7 @@ body{background:#fff}
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
         <button onclick="showAdminChoix()" style="background:#fff;border:1px solid #dfe6e0;border-radius:8px;padding:8px 14px;font-family:'Source Sans 3',sans-serif;font-size:.82rem;color:#65716b;cursor:pointer">← Retour</button>
         <h2 style="font-family:'Playfair Display',Georgia,serif;font-size:1.3rem;color:#153e35">Nouveau client</h2>
+        <button onclick="prefillNouveauClient()" title="Pré-remplir le formulaire avec une fiche établissement enregistrée" style="margin-left:auto;background:#f0faf8;border:1px solid rgba(31,86,73,.25);border-radius:8px;padding:8px 14px;font-family:'Source Sans 3',sans-serif;font-size:.8rem;color:#1f5649;font-weight:700;cursor:pointer">📋 Pré-remplir</button>
       </div>
       <div class="admin-section">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -1054,6 +1055,10 @@ body{background:#fff}
 
   <div class="reg" id="regBanner"><strong>Base réglementaire :</strong> Règl. CE 852/2004 · Arrêté 21/12/2009 · Règl. 178/2002 · Critères : ≥85% Conforme · 60-84% Surveillance · &lt;60% Danger</div>
 
+  <div style="text-align:center;margin:10px 0">
+    <button onclick="openAllerg()" style="background:#fff;border:1.5px solid rgba(31,86,73,.3);border-radius:999px;padding:8px 18px;font-family:'Source Sans 3',sans-serif;font-size:.84rem;font-weight:700;color:#1f5649;cursor:pointer">🥗 Allergènes (14) &amp; Étiquetage / Traçabilité</button>
+  </div>
+
   <div class="legend">
     <strong>Pondération :</strong>
     <span><span class="wd" style="background:var(--danger)"></span>Critique (×3)</span>
@@ -1105,6 +1110,51 @@ body{background:#fff}
   <div class="hist-panel" onclick="event.stopPropagation()">
     <h2>Historique des Audits <button class="hclose" onclick="closeHist()">✕</button></h2>
     <div class="hlist" id="hlist"></div>
+  </div>
+</div>
+
+<!-- ALLERGENES & ETIQUETAGE -->
+<div class="overlay" id="ovAllerg" onclick="closeAllerg(event)">
+  <div class="hist-panel" onclick="event.stopPropagation()" style="max-width:760px">
+    <h2>🥗 Allergènes &amp; Étiquetage <button class="hclose" onclick="closeAllerg()">✕</button></h2>
+    <div style="overflow-y:auto;max-height:calc(85vh - 70px);padding-right:4px">
+
+      <p style="font-size:.82rem;color:#65716b;margin:0 0 12px">Référence rapide — Règlement <strong>(UE) n°1169/2011 (INCO)</strong>. Les 14 allergènes à déclaration obligatoire doivent être indiqués au client (à l'écrit, accessible).</p>
+
+      <h3 style="font-size:.95rem;color:#153e35;margin:6px 0 8px">Les 14 allergènes à déclaration obligatoire</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+        <thead><tr style="background:#153e35;color:#fff">
+          <th style="padding:7px 8px;text-align:left;width:34px">N°</th>
+          <th style="padding:7px 8px;text-align:left">Allergène</th>
+          <th style="padding:7px 8px;text-align:left">Exemples de sources</th>
+        </tr></thead>
+        <tbody id="allergBody"></tbody>
+      </table>
+
+      <h3 style="font-size:.95rem;color:#153e35;margin:18px 0 8px">📋 Fiche Étiquetage &amp; Traçabilité (boulangerie-pâtisserie)</h3>
+      <div style="font-size:.82rem;line-height:1.7;color:#2d4a3e;background:#f0faf8;border:1px solid rgba(31,86,73,.18);border-radius:10px;padding:14px 16px">
+        <p style="margin:0 0 8px"><strong>Mentions obligatoires en vente directe (produits non préemballés) :</strong></p>
+        <ul style="margin:0 0 10px 18px;padding:0">
+          <li><strong>Dénomination de vente</strong> du produit</li>
+          <li><strong>Allergènes</strong> présents — indication écrite et accessible au client (panneau, classeur, ardoise)</li>
+          <li><strong>Prix</strong> à la pièce et/ou au kilo (TTC) — arrêté 09/08/1978 pour le prix du pain</li>
+          <li><strong>DLC</strong> (denrées sensibles : crèmes, produits frais) datée à la production</li>
+        </ul>
+        <p style="margin:0 0 8px"><strong>Mentions obligatoires si produit préemballé (vendu emballé) :</strong></p>
+        <ul style="margin:0 0 10px 18px;padding:0">
+          <li>Dénomination · <strong>liste des ingrédients</strong> (allergènes en <strong>gras</strong>) · quantité nette</li>
+          <li>DLC/DDM · conditions de conservation · nom &amp; adresse de l'exploitant</li>
+          <li>Origine si requise · n° de lot</li>
+        </ul>
+        <p style="margin:0 0 8px"><strong>Traçabilité (Règl. (CE) 178/2002 art.18 &amp; Règl. 852/2004) :</strong></p>
+        <ul style="margin:0 0 0 18px;padding:0">
+          <li>Conserver les <strong>bons de livraison / factures</strong> (origine, n° de lot) — 7 mentions obligatoires sur le BL</li>
+          <li><strong>Report du lot &amp; de la DLC</strong> lors d'un transvasement en bac (farine, ovoproduits…)</li>
+          <li>Principe <strong>FIFO</strong> (premier entré, premier sorti) · estampille sanitaire CE pour les produits d'origine animale</li>
+          <li>Conservation des enregistrements (T°, nettoyage, NC) : <strong>3 ans</strong> recommandé, à présenter en cas de contrôle DDPP</li>
+        </ul>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -4322,6 +4372,49 @@ function collectNouveauClientForm() {
   };
 }
 
+// ── Modèles d'établissement pour pré-remplissage rapide du formulaire Nouveau client ──
+var MODELES_ETABLISSEMENT = [
+  {
+    resp: "Faycal BOUSLAH",
+    etab: "SAS PAINS FACTORY COLMAR",
+    adresse: "81 boulevard National, 92500 Rueil-Malmaison",
+    tel: "07 86 20 27 37",
+    email: "faycal.boulangerie@gmail.com",
+    siret: "982 169 195 00012",
+    siren: "982 169 195",
+    legal: "Faycal BOUSLAH (Président)",
+    secteur: "BOULANGERIE",
+    auditeur: "Léa",
+    visite: "1ère visite",
+    eau: "oui"
+  }
+];
+
+function prefillNouveauClient() {
+  if (!MODELES_ETABLISSEMENT.length) { alert("Aucun modèle d'établissement enregistré."); return; }
+  var m;
+  if (MODELES_ETABLISSEMENT.length === 1) {
+    m = MODELES_ETABLISSEMENT[0];
+  } else {
+    var liste = MODELES_ETABLISSEMENT.map(function(x, i){ return (i+1) + '. ' + x.etab; }).join('\n');
+    var rep = prompt('Choisir un établissement à pré-remplir :\n' + liste + '\n\nNuméro :', '1');
+    var idx = parseInt(rep, 10) - 1;
+    if (isNaN(idx) || !MODELES_ETABLISSEMENT[idx]) return;
+    m = MODELES_ETABLISSEMENT[idx];
+  }
+  // Ne pas écraser une saisie en cours sans confirmation
+  var dejaRempli = (document.getElementById('ci_etab').value.trim() || document.getElementById('ci_resp').value.trim());
+  if (dejaRempli && !confirm('Le formulaire contient déjà des données. Les remplacer par « ' + m.etab + ' » ?')) return;
+  function set(id, val){ var el = document.getElementById(id); if (el && val != null) el.value = val; }
+  set('ci_resp', m.resp);   set('ci_etab', m.etab);     set('ci_adresse', m.adresse);
+  set('ci_tel', m.tel);     set('ci_email', m.email);   set('ci_siret', m.siret);
+  set('ci_siren', m.siren); set('ci_legal', m.legal);   set('ci_auditeur', m.auditeur);
+  set('ci_secteur', m.secteur || 'BOULANGERIE');
+  set('ci_visite', m.visite || '');
+  set('ci_eau', m.eau || 'oui');
+  if (typeof toast === 'function') toast('📋 Établissement « ' + m.etab + ' » pré-rempli — vérifiez puis générez le code.', 'ok');
+}
+
 // ── Afficher l'application audit ──
 function showApp(role) {
   document.getElementById('authScreen').style.display = 'none';
@@ -5611,7 +5704,7 @@ const SECTEURS = {
     ]},
     { s: 5, name: "RÉCEPTION", items: [
       { l: "Zone de réception", w: 2, ref: "Propre, rien au sol" },
-      { l: "Température à réception", w: 3, ref: "Frais +4°C max / surgelé -18°C" },
+      { l: "Température à réception", w: 3, ref: "Frais +4°C max / surgelé -18°C", type: "temp" },
       { l: "État des emballages / refus", w: 3, ref: "Refus si souillé ou abîmé" }
     ]},
     { s: 6, name: "DÉCONDITIONNEMENT & ACHEMINEMENT", items: [
@@ -5626,8 +5719,8 @@ const SECTEURS = {
       { l: "Traçabilité du report d'invendus (viennoiseries réincorporées)", w: 2, ref: "Tracé en interne" }
     ]},
     { s: 8, name: "STOCKAGE & CHAÎNE DU FROID", items: [
-      { l: "Chambre froide positive", w: 3, ref: "0 à +4°C" },
-      { l: "Congélateur / chambre négative", w: 3, ref: "-18°C" },
+      { l: "Chambre froide positive", w: 3, ref: "0 à +4°C", type: "temp" },
+      { l: "Congélateur / chambre négative", w: 3, ref: "-18°C", type: "temp" },
       { l: "Relevés de température des enceintes", w: 3, ref: "≥ 1×/jour, NC si dépassement" },
       { l: "Ordre de rangement (haut → bas)", w: 3, ref: "Prêt à consommer en haut, crus / souillés en bas" },
       { l: "Séparation cru / cuit", w: 3, ref: "Jamais mélangés ; cuit protégé au-dessus" },
@@ -5638,10 +5731,10 @@ const SECTEURS = {
       { l: "Réserve sèche", w: 2, ref: "Surélevée, FIFO, local sec" },
       { l: "Stockage de la farine", w: 2, ref: "Surélevée, FIFO, pas de mites alimentaires" },
       { l: "Stockage levure / levain", w: 2, ref: "Au froid si conservé, contenant propre" },
-      { l: "Œufs coquille", w: 3, ref: "T° constante (+5 à +15°C), poste de cassage dédié" },
-      { l: "Ovoproduits pasteurisés", w: 3, ref: "+4°C, DLC respectée après ouverture" },
-      { l: "Tour / plan de travail réfrigéré", w: 3, ref: "+4°C, tiroirs et joints propres" },
-      { l: "Surgelés crus (pâtons)", w: 2, ref: "-18°C jusqu'à la mise en œuvre" }
+      { l: "Œufs coquille", w: 3, ref: "T° constante (+5 à +15°C), poste de cassage dédié", type: "temp" },
+      { l: "Ovoproduits pasteurisés", w: 3, ref: "+4°C, DLC respectée après ouverture", type: "temp" },
+      { l: "Tour / plan de travail réfrigéré", w: 3, ref: "+4°C, tiroirs et joints propres", type: "temp" },
+      { l: "Surgelés crus (pâtons)", w: 2, ref: "-18°C jusqu'à la mise en œuvre", type: "temp" }
     ]},
     { s: 9, name: "MATÉRIEL DE PRODUCTION", items: [
       { l: "Pétrin (cuve, bras, axe)", w: 3, ref: "Pas de pâte sèche, joint propre, lubrifiant grade H1" },
@@ -5654,13 +5747,13 @@ const SECTEURS = {
       { l: "Échelles / plaques / chariots", w: 1, ref: "Lavables, propres, sans rouille" }
     ]},
     { s: 10, name: "PRODUCTION & MÉTHODE", items: [
-      { l: "Cuisson à cœur (flans, quiches, friands viande, appareils œufs)", w: 3, ref: "+63°C min à cœur (plus si viande)" },
-      { l: "Cuisson / pasteurisation des crèmes pâtissières à cœur", w: 3, ref: "≥ +82°C à cœur (anti-salmonelle)" },
-      { l: "Cellule de refroidissement rapide", w: 3, ref: "+63°C → +10°C à cœur en < 2h ; sonde à cœur" },
+      { l: "Cuisson à cœur (flans, quiches, friands viande, appareils œufs)", w: 3, ref: "+63°C min à cœur (plus si viande)", type: "temp" },
+      { l: "Cuisson / pasteurisation des crèmes pâtissières à cœur", w: 3, ref: "≥ +82°C à cœur (anti-salmonelle)", type: "temp" },
+      { l: "Cellule de refroidissement rapide", w: 3, ref: "+63°C → +10°C à cœur en < 2h ; sonde à cœur", type: "temp" },
       { l: "Crème pâtissière / anglaise", w: 3, ref: "Refroidie rapidement, +4°C, DLC courte" },
       { l: "Chantilly / mousses / appareils crus", w: 3, ref: "+4°C, filmés et datés" },
       { l: "Ressuage du pain sur grilles propres et aérées", w: 2, ref: "Zone aérée, grilles propres, pain hors sol" },
-      { l: "Maintien au chaud (bain-marie)", w: 2, ref: "+63°C minimum" },
+      { l: "Maintien au chaud (bain-marie)", w: 2, ref: "+63°C minimum", type: "temp" },
       { l: "Glaces / sorbets (si production)", w: 3, ref: "Mix pasteurisé, circuit nettoyé" },
       { l: "Décongélation", w: 3, ref: "Au froid +4°C, datée, jamais recongelée" },
       { l: "Huile de friture (si friture)", w: 3, ref: "T° max ~175°C, composés polaires ≤ 25%, changement tracé" },
@@ -5668,7 +5761,7 @@ const SECTEURS = {
     ]},
     { s: 11, name: "PRODUITS FINIS, VENTE & INFO CLIENT", items: [
       { l: "DLC des produits finis sensibles", w: 3, ref: "Datage à la production" },
-      { l: "Vitrine réfrigérée (pâtisseries fraîches)", w: 3, ref: "+4°C, propre, joints sains" },
+      { l: "Vitrine réfrigérée (pâtisseries fraîches)", w: 3, ref: "+4°C, propre, joints sains", type: "temp" },
       { l: "Vitrine sèche (pain / viennoiserie)", w: 1, ref: "Protégée du contact client" },
       { l: "Étiquetage / allergènes / prix (vente)", w: 3, ref: "DLC, allergènes (INCO), prix TTC" },
       { l: "Information allergènes (14) au client", w: 3, ref: "Écrite et accessible (Règl. UE 1169/2011)" },
@@ -5788,6 +5881,9 @@ function switchSecteur() {
         html += '<option value="3">Présent / conforme</option>';
         html += '<option value="1">Incomplet / à régulariser</option>';
         html += '<option value="0">Absent / inexistant</option>';
+      } else if (item.type === 'temp') {
+        html += '<option value="3">✓ Dans les seuils</option>';
+        html += '<option value="0">✗ Hors seuils</option>';
       } else {
         html += '<option value="3">A - Conforme</option>';
         html += '<option value="1">B - A ameliorer</option>';
@@ -6376,6 +6472,43 @@ function printRpt() {
 }
 
 function closeRpt() { document.getElementById('ovRpt').classList.remove('open'); }
+
+// ── Référence : 14 allergènes (Règl. UE 1169/2011) + étiquetage/traçabilité ──
+var ALLERGENES_14 = [
+  ["Céréales contenant du gluten", "Blé, seigle, orge, avoine, épeautre, kamut (farines, pain, viennoiseries)"],
+  ["Crustacés", "Crevettes, crabe, langoustine (garnitures, préparations traiteur)"],
+  ["Œufs", "Dorure, crèmes, appareils, meringues, mayonnaise"],
+  ["Poissons", "Préparations traiteur, certains additifs (gélatine)"],
+  ["Arachides", "Huile d'arachide, éclats, pralinés, décors"],
+  ["Soja", "Lécithine de soja (émulsifiant), farines, margarines"],
+  ["Lait", "Beurre, crème, lactose, poudre de lait (la plupart des pâtisseries)"],
+  ["Fruits à coque", "Amandes, noisettes, noix, cajou, pécan, pistache, macadamia (frangipane, pralinés)"],
+  ["Céleri", "Préparations salées, quiches, traiteur"],
+  ["Moutarde", "Sandwichs, préparations salées, traiteur"],
+  ["Graines de sésame", "Pains spéciaux, bagels, décors"],
+  ["Anhydride sulfureux / sulfites", "Fruits secs, fruits confits (> 10 mg/kg ou mg/L)"],
+  ["Lupin", "Farine de lupin (substitut, coloration jaune de certaines pâtes)"],
+  ["Mollusques", "Moules, calmars (préparations traiteur)"]
+];
+function openAllerg() {
+  var tb = document.getElementById('allergBody');
+  if (tb && !tb.children.length) {
+    var h = '';
+    for (var i = 0; i < ALLERGENES_14.length; i++) {
+      var bg = (i % 2 === 0) ? '#ffffff' : '#f4f9f7';
+      h += '<tr style="background:' + bg + '">'
+        + '<td style="padding:6px 8px;font-weight:700;color:#1f5649;border-bottom:1px solid #e2ece8">' + (i+1) + '</td>'
+        + '<td style="padding:6px 8px;font-weight:600;color:#153e35;border-bottom:1px solid #e2ece8">' + ALLERGENES_14[i][0] + '</td>'
+        + '<td style="padding:6px 8px;color:#3a4a5c;border-bottom:1px solid #e2ece8">' + ALLERGENES_14[i][1] + '</td>'
+        + '</tr>';
+    }
+    tb.innerHTML = h;
+  }
+  document.getElementById('ovAllerg').classList.add('open');
+}
+function closeAllerg() {
+  document.getElementById('ovAllerg').classList.remove('open');
+}
 function resetForm() {
   if (!confirm('Creer un nouveau rapport ? Les donnees seront effacees.')) return;
   document.querySelectorAll('.asel').forEach(function(s) { s.value = ''; });
