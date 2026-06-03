@@ -1256,63 +1256,59 @@ body{background:#fff}
 
     btn.onclick = function() { input.click(); };
 
+    // Compression : redimensionne (max 900px) et encode en JPEG pour un stockage léger
+    function compressImage(file, cb) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var im = new Image();
+            im.onload = function() {
+                var max = 900, w = im.width, h = im.height;
+                if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
+                else if (h >= w && h > max) { w = Math.round(w * max / h); h = max; }
+                try {
+                    var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+                    cv.getContext('2d').drawImage(im, 0, 0, w, h);
+                    cb(cv.toDataURL('image/jpeg', 0.6), w, h);
+                } catch (err) { cb(e.target.result, im.width, im.height); }
+            };
+            im.onerror = function() { cb(null); };
+            im.src = e.target.result;
+        };
+        reader.onerror = function() { cb(null); };
+        reader.readAsDataURL(file);
+    };
+
     input.onchange = function() {
         if (this.files && this.files[0]) {
             var file = this.files[0];
-            // URL.createObjectURL : URL blob instantanée
-            var imgData = URL.createObjectURL(file);
             var cible = document.querySelector('.mounir-target');
-
-            if (cible) {
+            if (!cible) { this.value = ''; return; }
+            var arRow = (cible.closest ? cible.closest('.ar') : null) || (cible.classList && cible.classList.contains('ar') ? cible : null);
+            var point = arRow ? (arRow.getAttribute('data-l') || '') : '';
+            var self = this;
+            compressImage(file, function(dataURL, w, h) {
+                self.value = '';
+                if (!dataURL) { alert('❌ Erreur de chargement de la photo'); return; }
                 var img = document.createElement('img');
-
-                // Force Safari à rester actif jusqu'à ce que l'image soit décodée
-                // (évite le throttling iOS qui fait que tout se débloque au scroll)
-                var keepAlive = true;
-                function tick() { if (keepAlive) requestAnimationFrame(tick); }
-                tick();
-
-                img.onload = function() {
-                    keepAlive = false; // Image décodée, on relâche
-                    // Léger délai pour laisser Safari respirer avant le popup bloquant
-                    setTimeout(function() {
-                        alert("✅ Photo enregistrée uniquement pour ce point !");
-                    }, 50);
-                };
-                img.onerror = function() {
-                    keepAlive = false;
-                    alert("❌ Erreur de chargement de la photo");
-                };
-
-                img.src = imgData;
                 img.className = 'photo-inseree';
-                img.style.width = "100%";
-                img.style.display = "block";
-                img.style.margin = "0";
-                img.style.border = "2px solid #153e35";
-                img.style.borderRadius = "6px";
-
-                // Conteneur + bouton de suppression (photo qui ne correspond pas, etc.)
+                img.src = dataURL;
+                if (point) img.setAttribute('data-point', point);
+                if (w) img.setAttribute('data-w', w);
+                if (h) img.setAttribute('data-h', h);
+                img.style.cssText = 'width:100%;display:block;margin:0;border:2px solid #153e35;border-radius:6px';
                 var wrap = document.createElement('div');
                 wrap.className = 'photo-wrap';
                 wrap.style.cssText = 'position:relative;width:200px;margin:10px auto';
                 var del = document.createElement('button');
-                del.type = 'button';
-                del.className = 'photo-del';
-                del.textContent = '✕';
+                del.type = 'button'; del.className = 'photo-del'; del.textContent = '✕';
                 del.title = 'Supprimer cette photo';
                 del.style.cssText = 'position:absolute;top:-9px;right:-9px;width:28px;height:28px;border-radius:50%;background:#e05252;color:#fff;border:2px solid #fff;font-size:14px;font-weight:700;line-height:1;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.35);z-index:5;padding:0';
-                del.onclick = function(ev) {
-                    ev.stopPropagation();
-                    if (confirm('Supprimer cette photo ?')) {
-                        try { if (img.src && img.src.indexOf('blob:') === 0) URL.revokeObjectURL(img.src); } catch(e){}
-                        wrap.remove();
-                    }
-                };
-                wrap.appendChild(img);
-                wrap.appendChild(del);
+                del.onclick = function(ev) { ev.stopPropagation(); if (confirm('Supprimer cette photo ?')) wrap.remove(); };
+                wrap.appendChild(img); wrap.appendChild(del);
                 cible.appendChild(wrap);
-            }
+                if (typeof toast === 'function') toast('📷 Photo ajoutée — elle figurera dans le rapport.', 'ok');
+                else setTimeout(function(){ alert('✅ Photo enregistrée pour ce point — elle figurera dans le rapport.'); }, 30);
+            });
         }
     };
 })();
@@ -6528,6 +6524,31 @@ function genRapport() {
     rBody += '<p><strong>CCP cles en boulangerie-patisserie :</strong> pasteurisation des cremes a coeur &gt;= 82 C - refroidissement rapide +63 a +10 C en moins de 2 h - chaine du froid 0 a +4 C - surgelation &lt;= -18 C - maitrise des allergenes (INCO).</p>';
     rBody += '</div>';
 
+    // ── ANNEXE PHOTOGRAPHIQUE (photos prises pendant l'audit, par point) ──
+    var _photoRows = document.querySelectorAll('.ar');
+    var _photoHtml = '';
+    for (var _pr = 0; _pr < _photoRows.length; _pr++) {
+      var _imgs = _photoRows[_pr].querySelectorAll('img.photo-inseree');
+      if (!_imgs.length) continue;
+      var _plabel = _photoRows[_pr].getAttribute('data-l') || 'Point de contrôle';
+      _photoHtml += '<div style="margin-bottom:16px;break-inside:avoid">';
+      _photoHtml += '<div style="font-size:.82rem;font-weight:700;color:#153e35;margin-bottom:6px">📷 ' + _plabel + '</div>';
+      _photoHtml += '<div style="display:flex;flex-wrap:wrap;gap:10px">';
+      for (var _pj = 0; _pj < _imgs.length; _pj++) {
+        var _di = _imgs[_pj];
+        _photoHtml += '<img class="photo-inseree" src="' + _di.getAttribute('src') + '"'
+          + (_di.getAttribute('data-point') ? ' data-point="' + (_di.getAttribute('data-point')||'').replace(/"/g,'&quot;') + '"' : '')
+          + (_di.getAttribute('data-w') ? ' data-w="' + _di.getAttribute('data-w') + '"' : '')
+          + (_di.getAttribute('data-h') ? ' data-h="' + _di.getAttribute('data-h') + '"' : '')
+          + ' style="max-width:320px;max-height:240px;border-radius:8px;border:1px solid #dfe6e0">';
+      }
+      _photoHtml += '</div></div>';
+    }
+    if (_photoHtml) {
+      rBody += '<div class="rpt-sec-ttl">ANNEXE PHOTOGRAPHIQUE</div>';
+      rBody += '<div style="margin-bottom:18px">' + _photoHtml + '</div>';
+    }
+
     rBody += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px">';
     rBody += '<div style="border:1px solid #dfe6e0;padding:14px;border-radius:10px">';
     rBody += '<div style="font-size:0.7rem;color:#65716b;margin-bottom:6px">Signature Auditeur - ' + auditeur + '</div>';
@@ -6841,14 +6862,26 @@ function getData() {
 function saveHist() {
   const d = getData();
   if (!d.m.etab) { toast("Veuillez renseigner l'établissement.", 'err'); return; }
+  // 1) CLOUD d'abord (source de vérité) — génère le rapport + photos et l'envoie à Supabase
+  try { saveAudit_remote(d); } catch(e) { console.warn('saveAudit_remote:', e); }
+  // 2) Historique local (best-effort : peut dépasser le quota avec des photos → on réduit)
   try {
-    const h = JSON.parse(localStorage.getItem('hh') || '[]');
+    var h = JSON.parse(localStorage.getItem('hh') || '[]');
     d.id = Date.now(); h.unshift(d); if (h.length > 25) h.pop();
-    localStorage.setItem('hh', JSON.stringify(h));
+    try {
+      localStorage.setItem('hh', JSON.stringify(h));
+    } catch(eQuota) {
+      // Quota dépassé (photos volumineuses) : on réduit l'historique jusqu'à ce que ça passe
+      while (h.length > 1) {
+        h.pop();
+        try { localStorage.setItem('hh', JSON.stringify(h)); break; } catch(e2) {}
+      }
+    }
     toast('✓ Audit sauvegardé.', 'ok');
-    saveAudit_remote(d);
-    var _k = currentAuditKey(); if (_k) clearDraft(_k); // audit validé → brouillon effacé
-  } catch(e) { toast('Erreur de sauvegarde.', 'err'); }
+  } catch(e) {
+    toast('✓ Audit envoyé (historique local indisponible).', 'ok');
+  }
+  var _k = currentAuditKey(); if (_k) clearDraft(_k); // audit validé → brouillon effacé
 }
 function saveAudit_remote(d) {
   if (typeof SUPABASE_URL === 'undefined' || typeof sbHeaders === 'undefined') return;
@@ -7727,6 +7760,53 @@ function _genAuditWord(a, info) {
   });
 }
 
+// Décode une data-URL (base64) en octets pour l'intégration d'images dans le Word
+function _dataURLtoBytes(durl) {
+  try {
+    var b64 = durl.split(',')[1]; var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  } catch (e) { return null; }
+}
+// Construit l'annexe photographique (docx) à partir des <img class="photo-inseree"> d'un DOM
+function _wordPhotoAnnex(D, tmp) {
+  var out = [];
+  if (!tmp) return out;
+  var imgs = tmp.querySelectorAll('img.photo-inseree');
+  if (!imgs.length) return out;
+  out.push(new D.Paragraph({ spacing:{before:120,after:80}, children:[] }));
+  out.push(new D.Table({ width:{size:9638,type:D.WidthType.DXA}, columnWidths:[9638],
+    rows:[new D.TableRow({children:[new D.TableCell({
+      shading:{fill:"1f5649", type:D.ShadingType.CLEAR}, margins:{top:120,bottom:120,left:280,right:280},
+      children:[new D.Paragraph({children:[new D.TextRun({text:"ANNEXE PHOTOGRAPHIQUE", size:22, color:"FFFFFF", bold:true, font:"Calibri"})]})]
+    })]})]
+  }));
+  out.push(new D.Paragraph({ spacing:{before:80,after:40}, children:[] }));
+  var lastPoint = null;
+  for (var i = 0; i < imgs.length; i++) {
+    var im = imgs[i];
+    var src = im.getAttribute('src') || '';
+    if (src.indexOf('data:image') !== 0) continue;
+    var bytes = _dataURLtoBytes(src);
+    if (!bytes) continue;
+    var pt = im.getAttribute('data-point') || '';
+    if (pt && pt !== lastPoint) {
+      out.push(new D.Paragraph({ spacing:{before:120,after:30}, children:[new D.TextRun({text:"📷 " + pt, bold:true, size:18, color:"153e35", font:"Calibri"})] }));
+      lastPoint = pt;
+    }
+    var nw = parseInt(im.getAttribute('data-w')) || 400, nh = parseInt(im.getAttribute('data-h')) || 300;
+    var ww = nw, hh = nh, maxw = 400;
+    if (ww > maxw) { hh = Math.round(hh * maxw / ww); ww = maxw; }
+    if (hh > 520) { ww = Math.round(ww * 520 / hh); hh = 520; }
+    try {
+      out.push(new D.Paragraph({ spacing:{before:20,after:140},
+        children:[ new D.ImageRun({ data: bytes, transformation:{ width: ww, height: hh } }) ] }));
+    } catch (e) {}
+  }
+  return out;
+}
+
 function _genRapportWord(a, info) {
   if (!a || !a.rapport_html) return;
   if (!window.docx || !window.docx.Document) { alert("docx non charge, reessayez."); return; }
@@ -8020,6 +8100,9 @@ function _genRapportWord(a, info) {
       }
     }
   }
+
+  // Annexe photographique (photos intégrées au rapport)
+  children = children.concat(_wordPhotoAnnex(D, tmp));
 
   children.push(vide());
   children.push(new D.Paragraph({
@@ -8400,6 +8483,9 @@ function _genDetailWord(a) {
     }
     children.push(vide());
   }
+
+  // Annexe photographique (photos intégrées au rapport)
+  children = children.concat(_wordPhotoAnnex(D, (typeof tmpR !== 'undefined' ? tmpR : null)));
 
   // Pied de page
   children.push(new D.Paragraph({
