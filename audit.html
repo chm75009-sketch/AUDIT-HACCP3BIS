@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Clean Food | ExpertAudit HACCP v3 bis — Boulangerie (101 points + annexe matériel)</title>
+<title>Clean Food | ExpertAudit HACCP v3 bis — Audit multi-secteurs (tronc commun + spécifique)</title>
 <meta name="theme-color" content="#153e35">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -679,6 +679,12 @@ body{background:#fff}
           <div style="font-size:2.5rem;margin-bottom:12px">📋</div>
           <h3 style="font-size:1rem;font-weight:700;color:#153e35;margin-bottom:6px">Client existant</h3>
           <p style="font-size:.8rem;color:#65716b;line-height:1.5">Choisir un client et démarrer ou reprendre un audit</p>
+        </div>
+        <!-- Audit libre (sans code client) -->
+        <div onclick="auditLibre()" style="background:#fff;border-radius:14px;padding:28px 24px;box-shadow:0 4px 24px rgba(26,35,50,.08);border:2px solid transparent;cursor:pointer;transition:all .2s;text-align:center;grid-column:1/-1" onmouseover="this.style.borderColor='#2d6f60'" onmouseout="this.style.borderColor='transparent'">
+          <div style="font-size:2.5rem;margin-bottom:12px">📝</div>
+          <h3 style="font-size:1rem;font-weight:700;color:#153e35;margin-bottom:6px">Audit libre</h3>
+          <p style="font-size:.8rem;color:#65716b;line-height:1.5">Démarrer un audit directement, saisie libre des informations — sans créer ni envoyer de code client</p>
         </div>
       </div>
       <div style="text-align:center">
@@ -4436,6 +4442,23 @@ function prefillNouveauClient() {
   if (typeof toast === 'function') toast('📋 Établissement « ' + m.etab + ' » pré-rempli — vérifiez puis générez le code.', 'ok');
 }
 
+// ── Audit libre (admin) : saisie libre, sans création ni envoi de code client ──
+function auditLibre() {
+  var sess = getSession();
+  if (sess) { delete sess.auditClientInfo; setSession(sess); } // pas de client pré-rempli → champs libres
+  // Nettoyer un éventuel bandeau client résiduel
+  var bar = document.getElementById('clientInfoBar'); if (bar) bar.remove();
+  showApp('admin');
+  // Laisser les champs établissement/responsable/auditeur vides et éditables
+  setTimeout(function() {
+    ['m-etab','m-resp','m-aud'].forEach(function(id){
+      var el = document.getElementById(id);
+      if (el) { el.removeAttribute('readonly'); el.style.background=''; el.style.color=''; el.style.cursor=''; }
+    });
+    if (typeof toast === 'function') toast('📝 Audit libre — renseignez librement les informations.', 'inf');
+  }, 450);
+}
+
 // ── Afficher l'application audit ──
 function showApp(role) {
   document.getElementById('authScreen').style.display = 'none';
@@ -5533,225 +5556,177 @@ function changePwd() {
 })();
 
 // ════════ BASE DE DONNÉES DES QUESTIONS ════════
-const SECTEURS = {
+// Architecture : TRONC COMMUN (critères communs à tous les secteurs)
+// + MODULE SPÉCIFIQUE (critères propres au secteur). SECTEURS est composé
+// automatiquement : tronc commun d'abord, puis le spécifique, chapitres renumérotés.
+
+const TRONC_COMMUN = [
+  { name: "DOCUMENTS, CERTIFICATS & PMS", items: [
+    { l: "Plan de Maîtrise Sanitaire (PMS)", w: 3, ref: "Existant, à jour et appliqué", type: "doc" },
+    { l: "Déclaration d'activité (cerfa 13984 DDPP)", w: 3, ref: "À jour", type: "doc" },
+    { l: "Formation hygiène 14h / référent formé", w: 2, ref: "Attestation archivée", type: "doc" },
+    { l: "Analyses microbiologiques (plan d'autocontrôle)", w: 2, ref: "Bulletins selon plan", type: "doc" },
+    { l: "Attestation d'entretien des groupes froids", w: 2, ref: "Annuelle", type: "doc" },
+    { l: "Contrat & rapports — nuisibles (dératisation / désinsectisation)", w: 2, ref: "Signé et à jour", type: "doc" },
+    { l: "Contrat & bordereaux — huiles / graisses usagées", w: 2, ref: "Enlèvement tracé", type: "doc" },
+    { l: "Contrat & bordereaux — déchets / biodéchets (loi AGEC)", w: 2, ref: "Collecte tracée", type: "doc" },
+    { l: "Potabilité de l'eau (analyses si réseau privé)", w: 2, ref: "Conforme", type: "doc" },
+    { l: "Registres & enregistrements (T°, nettoyage, NC)", w: 2, ref: "Tenus et à jour", type: "doc" }
+  ]},
+  { name: "MOYENS DE CONTRÔLE & AUTOSURVEILLANCE", items: [
+    { l: "Thermomètre à sonde", w: 3, ref: "Présent, fonctionnel, étalonné", type: "doc" },
+    { l: "Sonde à cœur (cuisson + refroidissement)", w: 3, ref: "Présente et étalonnée", type: "doc" },
+    { l: "Thermomètre dans chaque enceinte froide", w: 2, ref: "Présent et lisible", type: "doc" },
+    { l: "Système de datage des DLC (étiqueteuse)", w: 2, ref: "Opérationnel", type: "doc" },
+    { l: "Bacs alimentaires propres et identifiés", w: 2, ref: "En nombre suffisant", type: "doc" },
+    { l: "Registres vierges & classeur allergènes prêts", w: 2, ref: "Disponibles", type: "doc" }
+  ]},
+  { name: "LOCAUX, MILIEU & MARCHE EN AVANT", items: [
+    { l: "Sols / murs / plafonds", w: 2, ref: "Lessivables, sans moisissure ni écaillage" },
+    { l: "Éclairage des zones aliments", w: 1, ref: "Tubes protégés (bris de verre)" },
+    { l: "Marche en avant (circulation des produits)", w: 3, ref: "Pas de croisement propre / sale" },
+    { l: "Plans de travail dédiés par denrée", w: 3, ref: "Séparés ou nettoyés-désinfectés avant changement" },
+    { l: "Ventilation / extraction", w: 1, ref: "Fonctionnelle, filtres propres" },
+    { l: "Eau chaude / froide aux postes", w: 2, ref: "Disponible et potable" }
+  ]},
+  { name: "LE PERSONNEL", items: [
+    { l: "Lave-mains", w: 3, ref: "Eau chaude, savon, essuie-mains UU, commande non manuelle" },
+    { l: "Tenue de travail", w: 2, ref: "Propre, dédiée, coiffe, sans bijou ; chaussures dédiées" },
+    { l: "Lavage des mains (méthode et fréquence)", w: 3, ref: "Avant production, après souillure, sortie WC" },
+    { l: "État de santé / éviction", w: 3, ref: "Plaies protégées (pansement détectable), éviction tracée" },
+    { l: "Accès & circulation du personnel", w: 2, ref: "Parcours imposé : tenue, chaussures dédiées, lavage mains" },
+    { l: "Vestiaires / séparation ville-travail", w: 2, ref: "Séparés des zones de production" },
+    { l: "Interdiction manger / fumer en zone de production", w: 1, ref: "Respectée" }
+  ]},
+  { name: "RÉCEPTION", items: [
+    { l: "Zone de réception", w: 2, ref: "Propre, rien au sol" },
+    { l: "Température à réception", w: 3, ref: "Frais +4°C max / surgelé -18°C", type: "temp" },
+    { l: "État des emballages / refus", w: 3, ref: "Refus si souillé ou abîmé" },
+    { l: "Contrôle DLC/DDM à réception", w: 2, ref: "Vérifié, suffisant" },
+    { l: "Fiche de contrôle réception", w: 2, ref: "Renseignée et archivée", type: "doc" }
+  ]},
+  { name: "STOCKAGE & CHAÎNE DU FROID", items: [
+    { l: "Chambre froide positive", w: 3, ref: "0 à +4°C", type: "temp" },
+    { l: "Congélateur / chambre négative", w: 3, ref: "-18°C", type: "temp" },
+    { l: "Relevés de température des enceintes", w: 3, ref: "≥ 1×/jour, NC si dépassement" },
+    { l: "Ordre de rangement (haut → bas)", w: 3, ref: "Prêt à consommer en haut, crus / souillés en bas" },
+    { l: "Séparation cru / cuit", w: 3, ref: "Jamais mélangés ; cuit protégé au-dessus" },
+    { l: "Produits filmés, datés, FIFO, hors sol", w: 2, ref: "Tout couvert et identifié ; aucun carton" },
+    { l: "Aucun produit non alimentaire dans le froid", w: 3, ref: "Produits d'entretien exclus des enceintes" },
+    { l: "Joints de portes des frigos", w: 2, ref: "Propres, étanches, sans moisissure" },
+    { l: "Réserve sèche", w: 2, ref: "Surélevée, FIFO, local sec" }
+  ]},
+  { name: "TRAÇABILITÉ & ÉTIQUETAGE", items: [
+    { l: "Bons de livraison / lot / origine", w: 3, ref: "Conservés ; mentions obligatoires" },
+    { l: "DLC/DDM respectées (aucun produit dépassé)", w: 3, ref: "Critique — Règl. 178/2002" },
+    { l: "Étiquetage des produits maison (DLC, dénomination)", w: 2, ref: "Daté à la production" },
+    { l: "Information allergènes (14) au client", w: 3, ref: "Écrite et accessible (Règl. UE 1169/2011)" },
+    { l: "Archivage de la traçabilité (3 ans recommandé)", w: 2, ref: "Documents conservés", type: "doc" }
+  ]},
+  { name: "NETTOYAGE & DÉSINFECTION", items: [
+    { l: "Plan de nettoyage (PND)", w: 3, ref: "Affiché, suivi, dilutions précisées" },
+    { l: "Stockage des produits d'entretien", w: 3, ref: "Séparé des denrées" },
+    { l: "Plans de travail (surfaces)", w: 3, ref: "Lisses, sans fissure, désinfectés" },
+    { l: "Matériel de nettoyage adapté", w: 2, ref: "Propre, pas d'éponges/serpillières en zone aliments" },
+    { l: "Siphons / évacuations au sol", w: 2, ref: "Propres, sans refoulement ni odeur" }
+  ]},
+  { name: "NUISIBLES", items: [
+    { l: "Plan de lutte (contrat ou gestion interne)", w: 3, ref: "Tracé et efficace" },
+    { l: "Pièges / postes d'appâtage", w: 2, ref: "Numérotés, positionnés, intègres" },
+    { l: "Points d'entrée", w: 2, ref: "Étanches, grilles, bas de portes" },
+    { l: "Indices de présence", w: 3, ref: "Aucun indice toléré" }
+  ]},
+  { name: "DÉCHETS", items: [
+    { l: "Poubelles", w: 2, ref: "Couvercle, commande non manuelle, propres, vidées régulièrement" },
+    { l: "Tri des biodéchets (loi AGEC)", w: 2, ref: "Bac dédié + bordereau de collecte" },
+    { l: "Local poubelles", w: 2, ref: "Éloigné des denrées, lavable" }
+  ]}
+];
+
+const SPECIFIQUE = {
   RESTAURATION: [
-    { s: 1, name: "PERSONNEL & HYGIÈNE", items: [
-      { l: "Tenue vestimentaire réglementaire et coiffe propre", w: 2, ref: "Règl. 852/2004 - Art. 4" },
-      { l: "Lavage des mains : méthode et fréquence", w: 3, ref: "CCP - Contamination croisée" },
-      { l: "Absence de bijoux et plaies protégées", w: 2, ref: "BPH - Contamination physique" },
-      { l: "Formation HACCP obligatoire (14h min.)", w: 3, ref: "Décret 24/06/2011" },
-      { l: "État de santé du personnel (absence symptômes)", w: 1, ref: "Arrêté 21/12/2009" }
+    { name: "PRODUCTION & MÉTHODE", items: [
+      { l: "Cuisson à cœur des viandes", w: 3, ref: "≥ +63°C à cœur", type: "temp" },
+      { l: "Cuisson à cœur des volailles", w: 3, ref: "≥ +74°C à cœur", type: "temp" },
+      { l: "Refroidissement rapide", w: 3, ref: "+63°C → +10°C à cœur en < 2h", type: "temp" },
+      { l: "Maintien en liaison chaude", w: 3, ref: "≥ +63°C", type: "temp" },
+      { l: "Liaison froide / plats préparés à l'avance", w: 3, ref: "≤ +4°C", type: "temp" },
+      { l: "Décongélation", w: 3, ref: "Au froid +4°C, datée, jamais recongelée" },
+      { l: "Sauces, fonds & préparations sensibles", w: 2, ref: "DLC courte, conservés à +4°C" },
+      { l: "Produits d'œuf cru (mayonnaise, mousses)", w: 3, ref: "Ovoproduits pasteurisés recommandés, +4°C" }
     ]},
-    { s: 2, name: "RÉCEPTION & TEMPÉRATURES", items: [
-      { l: "Réception : Intégrité des colis et déballage des cartons", w: 2, ref: "Déconditionnement obligatoire" },
-      { l: "Températures enceintes froides (0-4°C)", w: 3, ref: "CCP - Arrêté 21/12/2009" },
-      { l: "Températures surgélation (≤ -18°C)", w: 3, ref: "CCP - Conservation" },
-      { l: "Cuisson à cœur (≥63°C viandes, ≥74°C volailles)", w: 3, ref: "CCP Majeur" },
-      { l: "Refroidissement rapide (63°C→10°C en < 2h)", w: 3, ref: "CCP - Arrêté 08/10/2013" },
-      { l: "Maintien en température chaude (≥63°C)", w: 3, ref: "CCP - Liaison chaude" },
-      { l: "Décongélation en enceinte réfrigérée (+3°C)", w: 2, ref: "BPH - Prolifération" }
+    { name: "SERVICE, PRODUITS FINIS & INFO CLIENT", items: [
+      { l: "DLC des préparations maison", w: 3, ref: "3 jours max, étiquetées" },
+      { l: "Buffet / self : maintien des températures", w: 3, ref: "Chaud ≥ +63°C / froid ≤ +4°C", type: "temp" },
+      { l: "Plats témoins conservés (si collectivité)", w: 2, ref: "100 g / plat, +3°C, 5 jours" },
+      { l: "Huile de friture (si friture)", w: 2, ref: "Composés polaires ≤ 25%, changement tracé" },
+      { l: "Information allergènes accessible en salle", w: 3, ref: "Carte ou support écrit (INCO)" }
     ]},
-    { s: 3, name: "TRAÇABILITÉ & ALLERGÈNES", items: [
-      { l: "Absence de produits DLC/DDM dépassés", w: 3, ref: "Critique - Règl. 178/2002" },
-      { l: "Étiquetage produits maison (DLC 3 jours max)", w: 2, ref: "Règl. UE 1169/2011" },
-      { l: "Archivage bons de livraison et étiquettes (3 ans)", w: 2, ref: "Traçabilité amont" },
-      { l: "Information client sur les 14 allergènes", w: 2, ref: "Règl. INCO" },
-      { l: "Gestion des huiles de friture (≤25% polaires)", w: 1, ref: "Qualité nutritionnelle" },
-      { l: "Gestion des déchets et poubelles à pédale", w: 1, ref: "BPH - Nuisibles" }
-    ]},
-    { s: 4, name: "NETTOYAGE & NUISIBLES", items: [
-      { l: "Plan de nettoyage-désinfection appliqué (PND)", w: 2, ref: "PMS obligatoire" },
-      { l: "Propreté hottes, grilles et moteurs", w: 2, ref: "Sécurité & Hygiène" },
-      { l: "Absence de nuisibles - Contrat dératisation", w: 3, ref: "CCP Critique" },
-      { l: "Entretien du matériel (trancheuses, robots)", w: 1, ref: "BPH - Nettoyage" },
-      { l: "Propreté des sols, murs et plafonds", w: 1, ref: "BPH - Environnement" }
-    ]},
-    { s: 5, name: "LOCAUX & MARCHE EN AVANT", items: [
-      { l: "Respect de la marche en avant (flux propre/sale)", w: 2, ref: "Contamination croisée" },
-      { l: "Code couleur planches à découper", w: 2, ref: "BPH - Séparation" },
-      { l: "Lave-mains dédié propre et équipé", w: 1, ref: "Hygiène des mains" },
-      { l: "Stockage hors sol (étagères/palettes)", w: 1, ref: "BPH - Rangement" }
-    ]},
-    { s: 6, name: "PMS & DOCUMENTATION", items: [
-      { l: "PMS formalisé et registres CCP tenus", w: 2, ref: "Dossier réglementaire" },
-      { l: "Enregistrements de surveillance quotidiens", w: 2, ref: "Preuve de maîtrise" },
-      { l: "Autocontrôles microbiologiques annuels", w: 1, ref: "Validation HACCP" }
+    { name: "MATÉRIEL DE CUISINE", items: [
+      { l: "Trancheuse / coupe-légumes", w: 2, ref: "Démontée et désinfectée après usage" },
+      { l: "Robot / cutter / batteur", w: 2, ref: "Propre, sans résidus, joints sains" },
+      { l: "Cellule de refroidissement rapide", w: 2, ref: "Fonctionnelle, sonde à cœur" },
+      { l: "Friteuse / plaques / fours", w: 1, ref: "Propres, sans dépôts carbonisés" }
     ]}
   ],
   RESTAURATION_RAPIDE: [
-    { s: 1, name: "PERSONNEL & HYGIENE", items: [
-      { l: "Tenue vestimentaire propre et coiffe adaptee", w: 2, ref: "BPHG4 SNARR" },
-      { l: "Lavage des mains : methode, frequence et lave-mains dedie equipe", w: 3, ref: "CCP - BPHG4 FP1 SNARR" },
-      { l: "Absence de bijoux, montres et plaies non protegees", w: 2, ref: "BPHG4 - Corps etrangers" },
-      { l: "Formation hygiene alimentaire obligatoire (14h min.)", w: 3, ref: "Code rural L.233-4 - BPHG4 FP3" },
-      { l: "Etat de sante : personnel symptomatique ecarte", w: 2, ref: "BPHG4 FP2 SNARR" }
+    { name: "PRODUCTION RAPIDE & CUISSON", items: [
+      { l: "Cuisson steaks hachés / viandes hachées", w: 3, ref: "≥ +65°C à cœur", type: "temp" },
+      { l: "Cuisson volailles & produits panés", w: 3, ref: "≥ +74°C à cœur", type: "temp" },
+      { l: "Huile de friture", w: 2, ref: "T° ~175°C, composés polaires ≤ 25%, changement tracé", type: "temp" },
+      { l: "Refroidissement rapide", w: 3, ref: "+63°C → +10°C en < 2h", type: "temp" },
+      { l: "Maintien liaison chaude", w: 3, ref: "≥ +63°C", type: "temp" }
     ]},
-    { s: 2, name: "RECEPTION & DECONDITIONNEMENT", items: [
-      { l: "Controle T° a reception : refrigeres ≤4°C, surgeles ≤-18°C", w: 3, ref: "CCP - BPHO1 SNARR" },
-      { l: "Verification integrite des emballages et DLC a reception", w: 2, ref: "BPHO1 SNARR" },
-      { l: "Deconditionnement : elimination des cartons en zone de production", w: 3, ref: "CCP - BPHO2 SNARR" },
-      { l: "Fiche de controle reception renseignee et archivee", w: 2, ref: "BPHO1 SNARR - Tracabilite" },
-      { l: "Refus documente en cas de non-conformite fournisseur", w: 2, ref: "Chapitre 6 SNARR" }
+    { name: "SANDWICHS & PRODUITS FROIDS", items: [
+      { l: "Vitrine / meuble réfrigéré (produits froids)", w: 3, ref: "≤ +4°C", type: "temp" },
+      { l: "DLC sandwichs / salades maison", w: 3, ref: "3 jours max, étiquetage complet" },
+      { l: "Assemblage à froid (poste propre, gants/pince)", w: 2, ref: "Pas de contact main nue" },
+      { l: "Gestion des invendus", w: 2, ref: "Retraits documentés en fin de service" }
     ]},
-    { s: 3, name: "TEMPERATURES & CUISSON", items: [
-      { l: "Temperatures enceintes froides (0-4°C) enregistrees", w: 3, ref: "CCP - BPHO3 SNARR" },
-      { l: "Temperatures surgelation (≤-18°C) enregistrees", w: 3, ref: "CCP - BPHO3 SNARR" },
-      { l: "Cuisson steaks haches/viandes hachees : T° coeur ≥65°C", w: 3, ref: "CCP CRITIQUE - BPHOS2 SNARR" },
-      { l: "Cuisson volailles et produits panes : T° coeur ≥74°C", w: 3, ref: "CCP - BPHO4 FP5 SNARR" },
-      { l: "Refroidissement rapide : +63°C a +10°C en moins de 2h", w: 3, ref: "CCP - BPHO4 FP6 SNARR" },
-      { l: "Maintien liaison chaude ≥63°C / liaison froide ≤4°C", w: 3, ref: "CCP - BPHO5 SNARR" },
-      { l: "Decongelation en enceinte refrigeree (+3°C max)", w: 2, ref: "BPHO4 FP2 SNARR" }
-    ]},
-    { s: 4, name: "SANDWICHES & PRODUITS SPECIFIQUES", items: [
-      { l: "Sandwiches froids exposes en meuble refrigere ≤4°C", w: 3, ref: "CCP - BPHOS1 SNARR" },
-      { l: "DLC sandwiches maison : 3 jours max avec etiquetage complet", w: 3, ref: "BPHOS1 SNARR" },
-      { l: "Huiles de friture : controle composes polaires ≤25%", w: 2, ref: "BPHO4 FP5 SNARR" },
-      { l: "Gestion des invendus documentee (retraits en fin de service)", w: 2, ref: "BPHO10 SNARR" },
-      { l: "Information allergenes : 14 allergenes affiches au comptoir", w: 3, ref: "Regl. UE 1169/2011" }
-    ]},
-    { s: 5, name: "NETTOYAGE, LOCAUX & NUISIBLES", items: [
-      { l: "Plan de nettoyage-desinfection (PND) applique et trace", w: 2, ref: "BPHG3 SNARR" },
-      { l: "Materiel de nettoyage adapte (pas d eponges ni serpillieres)", w: 2, ref: "BPHG3 SNARR" },
-      { l: "Absence de nuisibles - Contrat 3D en cours de validite", w: 3, ref: "CCP - BPHG2 FP4 SNARR" },
-      { l: "Proprete locaux et equipements (friteuses, grills, comptoirs)", w: 2, ref: "BPHG2 FP2 SNARR" },
-      { l: "Gestion des dechets : poubelles a commande non manuelle", w: 1, ref: "BPHG2 FP1 SNARR" },
-      { l: "Eau potable utilisee pour la preparation des aliments", w: 3, ref: "Regl. CE 852/2004 - Annexe II Ch.VII" }
-    ]},
-    { s: 6, name: "TRACABILITE & PMS", items: [
-      { l: "PMS formalise selon GBPH SNARR 2024", w: 2, ref: "Regl. 852/2004 - SNARR 2024" },
-      { l: "Enregistrements quotidiens temperatures et CCP", w: 3, ref: "SNARR - Surveillance CCP" },
-      { l: "Archivage bons de livraison et etiquettes sanitaires (3 ans)", w: 2, ref: "Chapitre 5 SNARR" },
-      { l: "Analyses microbiologiques annuelles (procedes et produits)", w: 1, ref: "SNARR - Verification HACCP" }
+    { name: "SERVICE & INFO CLIENT", items: [
+      { l: "Information allergènes (14) au comptoir", w: 3, ref: "Affichée et accessible (INCO)" },
+      { l: "Drive / livraison : maintien T° et délais", w: 2, ref: "Chaud ≥ +63°C / froid ≤ +4°C", type: "temp" },
+      { l: "Emballages au contact alimentaire", w: 2, ref: "Conformes (Règl. 1935/2004)" }
     ]}
   ],
-    BOUCHERIE: [
-    { s: 1, name: "HYGIENE DES MANIPULATEURS", items: [
-      { l: "Tenue de travail propre : blouse, tablier, coiffe, chaussures de securite", w: 2, ref: "GBPH Boucher p.18" },
-      { l: "Lavage des mains : methode correcte, frequence adaptee, lave-mains dedie", w: 3, ref: "CCP - GBPH Boucher p.37" },
-      { l: "Absence de bijoux, montres ; plaies protegees pansements bleus", w: 2, ref: "GBPH Boucher p.188" },
-      { l: "Formation HACCP obligatoire a jour (14h min.) - attestation disponible", w: 3, ref: "Code rural L.233-4" },
-      { l: "Etat de sante : personnel symptomatique ecarte de la production", w: 2, ref: "GBPH Boucher p.188" },
-      { l: "Interdiction de manger, fumer en zone de manipulation des viandes", w: 1, ref: "GBPH Boucher - BPH" }
+  BOUCHERIE: [
+    { name: "DÉCOUPE, HACHAGE & PRÉPARATIONS", items: [
+      { l: "Température de l'atelier de découpe", w: 3, ref: "≤ +12°C pendant les opérations", type: "temp" },
+      { l: "Hachage à la demande", w: 3, ref: "Viande hachée consommée le jour même" },
+      { l: "Préparations assaisonnées", w: 3, ref: "≤ +4°C, DLC 24h si non emballé", type: "temp" },
+      { l: "Couteaux / planches désinfectés entre espèces", w: 2, ref: "Pas de contamination croisée" },
+      { l: "Mise sous vide", w: 2, ref: "≤ +4°C, étiquetage DLC, traçabilité assurée", type: "temp" },
+      { l: "Refroidissement rapide après pré-cuisson", w: 3, ref: "+63°C → +10°C en < 2h", type: "temp" },
+      { l: "Carpaccio / tartare", w: 3, ref: "Viande traçable, préparé à la commande, servi immédiatement" }
     ]},
-    { s: 2, name: "RECEPTION & MAITRISE DU FROID", items: [
-      { l: "Controle T° a reception : bovins/ovins ≤4°C, volailles ≤4°C, congeles ≤-18°C", w: 3, ref: "CCP - GBPH Boucher p.48" },
-      { l: "Verification marque de salubrite veterinaire a reception", w: 3, ref: "Regl. CE 854/2004" },
-      { l: "Temperatures enceintes froides (0-4°C) enregistrees quotidiennement", w: 3, ref: "CCP - GBPH Boucher p.52" },
-      { l: "Temperatures congelation (≤-18°C) enregistrees, alarme fonctionnelle", w: 3, ref: "CCP - GBPH Boucher p.56" },
-      { l: "T° atelier de decoupe maitrisee (≤12°C) pendant les operations", w: 3, ref: "CCP - Arrete 21/12/2009" },
-      { l: "Deconditionnement : elimination immediate des cartons en zone de travail", w: 2, ref: "GBPH Boucher p.102" },
-      { l: "Abats refrigeres : T° ≤3°C, DLC 24h max apres livraison si non emballes", w: 3, ref: "CCP - GBPH Boucher p.145" }
+    { name: "PRODUITS, ÉTIQUETAGE & ORIGINE VIANDE", items: [
+      { l: "Étiquetage origine viande bovine", w: 3, ref: "Naissance, élevage, abattage (Règl. 1760/2000)" },
+      { l: "Marque de salubrité / estampille vétérinaire", w: 3, ref: "Présente et conforme à réception" },
+      { l: "Séparation des espèces au stockage", w: 2, ref: "Bovins, porcins, volailles, abats isolés" },
+      { l: "Abats réfrigérés", w: 3, ref: "≤ +3°C, DLC 24h si non emballés", type: "temp" },
+      { l: "Vitrine de vente réfrigérée", w: 3, ref: "≤ +4°C, propre, joints sains", type: "temp" }
     ]},
-    { s: 3, name: "DECOUPE, HACHAGE & PREPARATIONS", items: [
-      { l: "Decoupe : plans de travail propres, couteaux desinfectes entre especes", w: 2, ref: "GBPH Boucher p.61" },
-      { l: "Hachage a la demande : viande hachee consommee le jour meme", w: 3, ref: "CCP CRITIQUE - Regl. CE 853/2004" },
-      { l: "Preparations assaisonnees : T° ≤4°C, DLC 24h si non emballe", w: 3, ref: "CCP - GBPH Boucher p.71" },
-      { l: "Mise sous vide : T° ≤4°C, etiquetage DLC correct, tracabilite assuree", w: 2, ref: "GBPH Boucher p.91" },
-      { l: "Refroidissement rapide apres precuisson : <2h de 63°C a 10°C", w: 3, ref: "CCP - GBPH Boucher p.89" },
-      { l: "Decongelation uniquement en enceinte refrigeree (+3°C max)", w: 2, ref: "GBPH Boucher p.99" },
-      { l: "Carpaccio : viande tracable, prepare a la commande, servi immediatement", w: 3, ref: "CCP - GBPH Boucher p.216" }
+    { name: "AGRÉMENT & SOUS-PRODUITS ANIMAUX", items: [
+      { l: "Agrément sanitaire ou dérogation à l'agrément", w: 3, ref: "En cours de validité (DDPP)", type: "doc" },
+      { l: "Sous-produits animaux catégorie 3", w: 2, ref: "Bac dédié identifié, enlèvement tracé" },
+      { l: "Bordereaux d'enlèvement SPA", w: 2, ref: "Conservés (Règl. 1069/2009)", type: "doc" }
     ]},
-    { s: 4, name: "MATIERES PREMIERES & STOCKAGE", items: [
-      { l: "Separation des especes au stockage (bovins, porcins, volailles, abats)", w: 2, ref: "GBPH Boucher p.52" },
-      { l: "Produits laitiers : T° ≤4°C, DLC respectees", w: 2, ref: "GBPH Boucher p.159" },
-      { l: "Oeufs et ovoproduits : stockage correct, coquilles saines", w: 2, ref: "GBPH Boucher p.156" },
-      { l: "Produits sous vide : integrite emballages verifiee, T° et DLC respectees", w: 2, ref: "GBPH Boucher p.165" },
-      { l: "Produits surgeles : T° ≤-18°C, absence de decongelation partielle", w: 3, ref: "GBPH Boucher p.164" },
-      { l: "Methode FIFO appliquee - aucun produit perime en stockage ou vitrine", w: 3, ref: "GBPH Boucher p.32" }
-    ]},
-    { s: 5, name: "TRACABILITE & ETIQUETAGE", items: [
-      { l: "Etiquetage origine viandes bovines obligatoire (naissance, elevage, abattage)", w: 3, ref: "CCP - Regl. CE 1760/2000" },
-      { l: "DLC/DDM respectees sur tous les produits", w: 3, ref: "CCP - Regl. CE 178/2002" },
-      { l: "Etiquetage produits maison : composition, poids, allergenes, DLC", w: 2, ref: "Regl. UE 1169/2011" },
-      { l: "Archivage bons de livraison et marques sanitaires (3 ans)", w: 2, ref: "Regl. CE 178/2002" },
-      { l: "Information allergenes disponible pour le consommateur", w: 2, ref: "Regl. UE 1169/2011" }
-    ]},
-    { s: 6, name: "NETTOYAGE, LOCAUX & NUISIBLES", items: [
-      { l: "Nettoyage hachoir et trancheuse apres chaque utilisation (demontage)", w: 3, ref: "CCP - GBPH Boucher p.193" },
-      { l: "Plan de nettoyage-desinfection (PND) applique et enregistre", w: 2, ref: "GBPH Boucher p.171" },
-      { l: "Locaux de preparation : surfaces lisses, lavables, bon etat", w: 2, ref: "GBPH Boucher p.198" },
-      { l: "Locaux de vente propres : vitrine refrigeree fonctionnelle", w: 2, ref: "GBPH Boucher p.210" },
-      { l: "Absence de nuisibles - Contrat deratisation/desinsectisation valide", w: 3, ref: "CCP - GBPH Boucher p.203" },
-      { l: "Gestion des dechets et sous-produits animaux categorie 3", w: 2, ref: "Regl. CE 1069/2009" },
-      { l: "Eau potable utilisee pour tous les usages alimentaires et nettoyage", w: 3, ref: "Regl. CE 852/2004 Annexe II" }
-    ]},
-    { s: 7, name: "PMS, AGREMENT & DOCUMENTATION", items: [
-      { l: "Agrement sanitaire ou dispense d agrement en cours de validite (DDPP)", w: 3, ref: "CCP - Regl. CE 853/2004" },
-      { l: "PMS formalise : BPH + analyse HACCP + tracabilite + gestion NC", w: 2, ref: "Regl. CE 852/2004" },
-      { l: "Enregistrements quotidiens temperatures et surveillance CCP", w: 3, ref: "GBPH Boucher p.40" },
-      { l: "Analyses microbiologiques annuelles : surfaces et viandes hachees", w: 2, ref: "Regl. CE 2073/2005" }
+    { name: "ANNEXE — MATÉRIEL DE BOUCHERIE", items: [
+      { l: "Hachoir", w: 3, ref: "Démonté, nettoyé et désinfecté après chaque usage ; pas de viande incrustée" },
+      { l: "Trancheuse", w: 3, ref: "Lame et carter démontés, désinfectés ; protection conforme" },
+      { l: "Scie à os", w: 2, ref: "Lame propre, sans débris ; nettoyage tracé" },
+      { l: "Poussoir / hachoir à saucisses", w: 2, ref: "Démonté et désinfecté ; joints sains" },
+      { l: "Billot / plan de découpe", w: 2, ref: "Sans fissure, raboté/désinfecté, matériau alimentaire" }
     ]}
   ],
   BOULANGERIE: [
-    { s: 1, name: "DOCUMENTS, CERTIFICATS & PMS", items: [
-      { l: "Plan de Maîtrise Sanitaire (PMS)", w: 3, ref: "Existant, à jour et appliqué", type: "doc" },
-      { l: "Déclaration d'activité (cerfa 13984 DDPP)", w: 3, ref: "À jour", type: "doc" },
-      { l: "Formation hygiène 14h / référent formé", w: 2, ref: "Attestation archivée", type: "doc" },
-      { l: "Analyses microbiologiques", w: 2, ref: "Bulletins selon plan d'autocontrôle", type: "doc" },
-      { l: "Conformité alimentaire des matériaux (tapis, rouleaux, bacs)", w: 2, ref: "Certificat disponible", type: "doc" },
-      { l: "Certificat de ramonage annuel (four / conduits)", w: 2, ref: "Annuel, archivé", type: "doc" },
-      { l: "Étalonnage des thermomètres / sondes", w: 2, ref: "Certificats valides", type: "doc" },
-      { l: "Attestation d'entretien des groupes froids", w: 2, ref: "Annuelle", type: "doc" },
-      { l: "Contrat & rapports — nuisibles (dératisation / désinsectisation)", w: 2, ref: "Signé et à jour", type: "doc" },
-      { l: "Contrat & bordereaux — huiles usagées", w: 2, ref: "Enlèvement tracé", type: "doc" },
-      { l: "Contrat & bordereaux — biodéchets (loi AGEC)", w: 2, ref: "Collecte tracée", type: "doc" },
-      { l: "Potabilité de l'eau (analyses si réseau privé)", w: 2, ref: "Conforme", type: "doc" },
-      { l: "Registres & enregistrements (T°, nettoyage, NC)", w: 2, ref: "Tenus et à jour", type: "doc" }
-    ]},
-    { s: 2, name: "MOYENS DE CONTRÔLE & AUTOSURVEILLANCE", items: [
-      { l: "Thermomètre à sonde", w: 3, ref: "Présent, fonctionnel, étalonné", type: "doc" },
-      { l: "Sonde à cœur (cuisson + refroidissement)", w: 3, ref: "Présente et étalonnée", type: "doc" },
-      { l: "Thermomètre dans chaque enceinte froide", w: 2, ref: "Présent et lisible", type: "doc" },
-      { l: "Thermomètre d'ambiance chambre de pousse", w: 1, ref: "Présent", type: "doc" },
-      { l: "Testeur / bandelettes composés polaires (huile)", w: 2, ref: "Disponible si friture", type: "doc" },
-      { l: "Minuteur / horloge pour les barèmes de temps", w: 1, ref: "Disponible", type: "doc" },
-      { l: "Système de datage des DLC (étiqueteuse)", w: 2, ref: "Opérationnel", type: "doc" },
-      { l: "Bacs alimentaires propres et identifiés", w: 2, ref: "En nombre suffisant", type: "doc" },
-      { l: "Registres vierges & classeur allergènes prêts", w: 2, ref: "Disponibles", type: "doc" }
-    ]},
-    { s: 3, name: "LOCAUX, MILIEU & MARCHE EN AVANT", items: [
-      { l: "Sols / murs / plafonds", w: 2, ref: "Lessivables, sans moisissure ni écaillage" },
-      { l: "Éclairage des zones aliments", w: 1, ref: "Tubes protégés (bris de verre)" },
-      { l: "Marche en avant (circulation des produits)", w: 3, ref: "Pas de croisement propre / sale" },
-      { l: "Plans de travail dédiés par denrée", w: 3, ref: "Séparés ou nettoyés-désinfectés avant changement" },
-      { l: "Maîtrise des poussières de farine volatiles", w: 1, ref: "Versement maîtrisé, ventilation / aspiration" }
-    ]},
-    { s: 4, name: "LE PERSONNEL", items: [
-      { l: "Lave-mains", w: 3, ref: "Eau chaude, savon, essuie-mains UU, commande non manuelle" },
-      { l: "Tenue labo (production)", w: 2, ref: "Propre, dédiée, coiffe, sans bijou ; chaussures dédiées" },
-      { l: "Tenue pâtissier (zone crèmes)", w: 3, ref: "Idem labo + aucun contact main nue avec les crèmes" },
-      { l: "Tenue vente / salon de thé", w: 2, ref: "Propre, distincte du labo ; pince ou papier" },
-      { l: "État de santé / éviction", w: 3, ref: "Plaies protégées (pansement détectable), éviction tracée" },
-      { l: "Accès & circulation du personnel", w: 2, ref: "Parcours imposé : tenue, chaussures dédiées, lavage mains" },
-      { l: "Vestiaires / séparation ville-travail", w: 2, ref: "Séparés des zones de production" }
-    ]},
-    { s: 5, name: "RÉCEPTION", items: [
-      { l: "Zone de réception", w: 2, ref: "Propre, rien au sol" },
-      { l: "Température à réception", w: 3, ref: "Frais +4°C max / surgelé -18°C", type: "temp" },
-      { l: "État des emballages / refus", w: 3, ref: "Refus si souillé ou abîmé" }
-    ]},
-    { s: 6, name: "DÉCONDITIONNEMENT & ACHEMINEMENT", items: [
+    { name: "DÉCONDITIONNEMENT & ACHEMINEMENT", items: [
       { l: "Retrait des emballages de transport à l'entrée", w: 2, ref: "Cartons / palettes hors zone de production" },
       { l: "Conservation de l'emballage primaire (lait, beurre…)", w: 2, ref: "Gardé jusqu'à utilisation" },
       { l: "Transvasement en bac alimentaire (farine…)", w: 2, ref: "Bac propre, fermé, identifié" },
       { l: "Report de la traçabilité sur le bac transvasé", w: 3, ref: "N° de lot + DLC reportés" }
     ]},
-    { s: 7, name: "TRAÇABILITÉ", items: [
-      { l: "Bons de livraison / lot / origine", w: 3, ref: "Conservés ; 7 mentions obligatoires" },
-      { l: "Estampille sanitaire (produits animaux)", w: 2, ref: "Marque CE conforme" },
-      { l: "Traçabilité du report d'invendus (viennoiseries réincorporées)", w: 2, ref: "Tracé en interne" }
-    ]},
-    { s: 8, name: "STOCKAGE & CHAÎNE DU FROID", items: [
-      { l: "Chambre froide positive", w: 3, ref: "0 à +4°C", type: "temp" },
-      { l: "Congélateur / chambre négative", w: 3, ref: "-18°C", type: "temp" },
-      { l: "Relevés de température des enceintes", w: 3, ref: "≥ 1×/jour, NC si dépassement" },
-      { l: "Ordre de rangement (haut → bas)", w: 3, ref: "Prêt à consommer en haut, crus / souillés en bas" },
-      { l: "Séparation cru / cuit", w: 3, ref: "Jamais mélangés ; cuit protégé au-dessus" },
-      { l: "Volaille, poisson & œufs coquille isolés", w: 3, ref: "Tout en bas, bac fermé, jamais au-dessus des crèmes" },
-      { l: "Produits filmés, datés, FIFO, hors sol", w: 2, ref: "Tout couvert et identifié ; aucun carton" },
-      { l: "Aucun produit non alimentaire dans le froid", w: 3, ref: "Produits d'entretien exclus des enceintes" },
-      { l: "Joints de portes des frigos", w: 2, ref: "Propres, étanches, sans moisissure" },
-      { l: "Réserve sèche", w: 2, ref: "Surélevée, FIFO, local sec" },
+    { name: "MATIÈRES PREMIÈRES SPÉCIFIQUES", items: [
       { l: "Stockage de la farine", w: 2, ref: "Surélevée, FIFO, pas de mites alimentaires" },
       { l: "Stockage levure / levain", w: 2, ref: "Au froid si conservé, contenant propre" },
       { l: "Œufs coquille", w: 3, ref: "T° constante (+5 à +15°C), poste de cassage dédié", type: "temp" },
@@ -5759,17 +5734,7 @@ const SECTEURS = {
       { l: "Tour / plan de travail réfrigéré", w: 3, ref: "+4°C, tiroirs et joints propres", type: "temp" },
       { l: "Surgelés crus (pâtons)", w: 2, ref: "-18°C jusqu'à la mise en œuvre", type: "temp" }
     ]},
-    { s: 9, name: "MATÉRIEL DE PRODUCTION", items: [
-      { l: "Pétrin (cuve, bras, axe)", w: 3, ref: "Pas de pâte sèche, joint propre, lubrifiant grade H1" },
-      { l: "Batteur / robot", w: 3, ref: "Fouet et crochet désinfectés entre préparations" },
-      { l: "Laminoir (rouleaux, tapis)", w: 2, ref: "Sans pâte incrustée, tapis contact alimentaire" },
-      { l: "Diviseuse / façonneuse", w: 2, ref: "Mécanisme propre, sans huile rance" },
-      { l: "Toiles de pousse / bannetons", w: 2, ref: "Brossage à sec, séchage, sans moisissure" },
-      { l: "Chambre de pousse / fermentation", w: 2, ref: "Pousse +25 à +28°C (70-80% hum.) + blocage +4°C ; sans moisissure" },
-      { l: "Four (joints, soles, hotte)", w: 1, ref: "Joints intègres, sans dépôts carbonisés ; ramonage à jour" },
-      { l: "Échelles / plaques / chariots", w: 1, ref: "Lavables, propres, sans rouille" }
-    ]},
-    { s: 10, name: "PRODUCTION & MÉTHODE", items: [
+    { name: "PRODUCTION & MÉTHODE", items: [
       { l: "Cuisson à cœur (flans, quiches, friands viande, appareils œufs)", w: 3, ref: "+63°C min à cœur (plus si viande)", type: "temp" },
       { l: "Cuisson / pasteurisation des crèmes pâtissières à cœur", w: 3, ref: "≥ +82°C à cœur (anti-salmonelle)", type: "temp" },
       { l: "Cellule de refroidissement rapide", w: 3, ref: "+63°C → +10°C à cœur en < 2h ; sonde à cœur", type: "temp" },
@@ -5782,32 +5747,26 @@ const SECTEURS = {
       { l: "Huile de friture (si friture)", w: 3, ref: "T° max ~175°C, composés polaires ≤ 25%, changement tracé" },
       { l: "Poches à douille / douilles", w: 2, ref: "Usage unique ou désinfectées ; pas de réemploi de crème" }
     ]},
-    { s: 11, name: "PRODUITS FINIS, VENTE & INFO CLIENT", items: [
+    { name: "MATÉRIEL DE PRODUCTION", items: [
+      { l: "Certificat de ramonage annuel (four / conduits)", w: 2, ref: "Annuel, archivé", type: "doc" },
+      { l: "Conformité alimentaire des matériaux (tapis, rouleaux, bacs)", w: 2, ref: "Certificat disponible", type: "doc" },
+      { l: "Pétrin (cuve, bras, axe)", w: 3, ref: "Pas de pâte sèche, joint propre, lubrifiant grade H1" },
+      { l: "Batteur / robot", w: 3, ref: "Fouet et crochet désinfectés entre préparations" },
+      { l: "Laminoir (rouleaux, tapis)", w: 2, ref: "Sans pâte incrustée, tapis contact alimentaire" },
+      { l: "Diviseuse / façonneuse", w: 2, ref: "Mécanisme propre, sans huile rance" },
+      { l: "Toiles de pousse / bannetons", w: 2, ref: "Brossage à sec, séchage, sans moisissure" },
+      { l: "Chambre de pousse / fermentation", w: 2, ref: "Pousse +25 à +28°C (70-80% hum.) + blocage +4°C ; sans moisissure" },
+      { l: "Four (joints, soles, hotte)", w: 1, ref: "Joints intègres, sans dépôts carbonisés ; ramonage à jour" },
+      { l: "Échelles / plaques / chariots", w: 1, ref: "Lavables, propres, sans rouille" }
+    ]},
+    { name: "PRODUITS FINIS, VENTE & INFO CLIENT", items: [
       { l: "DLC des produits finis sensibles", w: 3, ref: "Datage à la production" },
       { l: "Vitrine réfrigérée (pâtisseries fraîches)", w: 3, ref: "+4°C, propre, joints sains", type: "temp" },
       { l: "Vitrine sèche (pain / viennoiserie)", w: 1, ref: "Protégée du contact client" },
       { l: "Étiquetage / allergènes / prix (vente)", w: 3, ref: "DLC, allergènes (INCO), prix TTC" },
-      { l: "Information allergènes (14) au client", w: 3, ref: "Écrite et accessible (Règl. UE 1169/2011)" },
       { l: "Matériel de service (pinces)", w: 2, ref: "Propres, pas de contact main nue" }
     ]},
-    { s: 12, name: "NETTOYAGE & DÉSINFECTION", items: [
-      { l: "Plan de nettoyage (PND)", w: 3, ref: "Affiché, suivi, dilutions précisées" },
-      { l: "Stockage des produits d'entretien", w: 3, ref: "Séparé des denrées" },
-      { l: "Plans de travail (surfaces)", w: 3, ref: "Lisses, sans fissure, désinfectés" },
-      { l: "Siphons / évacuations au sol", w: 2, ref: "Propres, sans refoulement ni odeur" }
-    ]},
-    { s: 13, name: "NUISIBLES", items: [
-      { l: "Plan de lutte (contrat ou gestion interne)", w: 3, ref: "Tracé et efficace" },
-      { l: "Pièges / postes d'appâtage", w: 2, ref: "Numérotés, positionnés, intègres" },
-      { l: "Points d'entrée", w: 2, ref: "Étanches, grilles, bas de portes" },
-      { l: "Indices de présence", w: 3, ref: "Aucun indice toléré" }
-    ]},
-    { s: 14, name: "DÉCHETS", items: [
-      { l: "Poubelles", w: 2, ref: "Couvercle, propres, vidées régulièrement" },
-      { l: "Tri des biodéchets (loi AGEC)", w: 2, ref: "Bac dédié + bordereau de collecte" },
-      { l: "Local poubelles", w: 2, ref: "Éloigné des denrées, lavable" }
-    ]},
-    { s: 15, name: "ANNEXE — CONTRÔLE MATÉRIEL DU FOURNIL (7 machines)", items: [
+    { name: "ANNEXE — CONTRÔLE MATÉRIEL DU FOURNIL (7 machines)", items: [
       { l: "1. Pétrin", w: 3, ref: "Zone : sous la tête, racleur de cuve, grille de sécurité et boutons · Risques : croûtes de pâte ancienne (fermentation/moisissures), écaillage/rouille (corps étrangers) · Docs : PND quotidien émargé, fiche technique lubrifiant grade alimentaire H1" },
       { l: "2. Refroidisseur d'eau", w: 3, ref: "Zone : cuve tampon, bras de mélange/doseur, tuyauteries de sortie · Risques : stagnation, rupture liaison froide (>10°C), biofilms (Legionella) · Docs : attestation entretien annuel groupe froid, registre détartrage/désinfection cuve (1-2×/an)" },
       { l: "3. Diviseuse", w: 2, ref: "Zone : talons de coupe (fond de cuve), entre couteaux rétractables, vérin hydraulique · Risques : pâte humide coincée (pourrissement), insectes de la farine, fuite huile hydraulique non alimentaire · Docs : protocole démontage/nettoyage en position maintenance, émargement quotidien, fiche technique huile du vérin" },
@@ -5817,6 +5776,20 @@ const SECTEURS = {
       { l: "7. Four à soles", w: 2, ref: "Zone : dalles pierre réfractaire (soles), vitres/poignées des bouches, hotte d'aspiration des buées · Risques : débris carbonisés/suie (HAP), brisure de pierre réfractaire (corps étrangers) · Docs : certificat de ramonage annuel des conduits gaz/buées, fiche de contrôle nettoyage/aspiration hebdomadaire des soles" }
     ]}
   ]
+};
+
+// Compose un secteur : tronc commun + module spécifique, chapitres renumérotés (s = 1..N)
+function _composeSecteur(specifique) {
+  return TRONC_COMMUN.concat(specifique || []).map(function(ch, i) {
+    return { s: i + 1, name: ch.name, items: ch.items };
+  });
+}
+
+const SECTEURS = {
+  RESTAURATION:        _composeSecteur(SPECIFIQUE.RESTAURATION),
+  RESTAURATION_RAPIDE: _composeSecteur(SPECIFIQUE.RESTAURATION_RAPIDE),
+  BOULANGERIE:         _composeSecteur(SPECIFIQUE.BOULANGERIE),
+  BOUCHERIE:           _composeSecteur(SPECIFIQUE.BOUCHERIE)
 };
 
 const RCO = {
@@ -5869,7 +5842,7 @@ function switchSecteur() {
     html += '<div class="sec-num">' + section.s + '</div>';
     html += '<div class="sec-ttl">' + section.name + '</div>';
     html += '</div><div class="sec-badge" id="b' + section.s + '">--</div></div>';
-    if (section.s === 2) {
+    if (/FROID|STOCKAGE/i.test(section.name)) {
       html += '<div class="tref">';
       html += '<span><strong>Froid :</strong> 0-+4C</span>';
       html += '<span><strong>Surgele :</strong> inf-18C</span>';
@@ -6218,24 +6191,29 @@ function genRapport() {
         _refMap[_itq.l] = { ref: _itq.ref || '', type: _itq.type || '', s: _secq.s, name: _secq.name };
       }
     }
-    var _REGCHAP = {
-      1:"Regl. (CE) 852/2004 art.5 (PMS/HACCP) - Code rural L.233-4 (formation 14h)",
-      2:"Regl. (CE) 852/2004 Ann.II - Arrete 21/12/2009 (temperatures)",
-      3:"Regl. (CE) 852/2004 Ann.II ch. I-II (locaux, marche en avant)",
-      4:"Regl. (CE) 852/2004 Ann.II ch. VIII (hygiene du personnel)",
-      5:"Regl. (CE) 178/2002 (tracabilite) - Arrete 21/12/2009 (T receptions)",
-      6:"Regl. (CE) 852/2004 - Regl. (CE) 178/2002 (tracabilite)",
-      7:"Regl. (CE) 178/2002 art.18 (tracabilite) - Regl. (CE) 853/2004 (estampille)",
-      8:"Arrete 21/12/2009 (T conservation) - Regl. (CE) 852/2004 Ann.II ch. IX",
-      9:"Regl. (CE) 852/2004 Ann.II ch. V - Regl. (CE) 1935/2004 (contact alimentaire)",
-      10:"Arrete 08/10/2013 (refroidissement) - Regl. (CE) 2073/2005 (microbio) - CCP HACCP",
-      11:"Regl. (UE) 1169/2011 (INCO/allergenes) - Arrete 09/08/1978 (prix du pain)",
-      12:"Regl. (CE) 852/2004 Ann.II ch. I-II (nettoyage-desinfection)",
-      13:"Regl. (CE) 852/2004 Ann.II ch. IX (lutte contre les nuisibles)",
-      14:"Regl. (CE) 852/2004 Ann.II ch. VI - Loi AGEC (biodechets)",
-      15:"Regl. (CE) 852/2004 - Regl. (CE) 1935/2004 (materiaux au contact)"
-    };
-    function _regFor(sn){ return (secteur === 'BOULANGERIE' && _REGCHAP[sn]) ? _REGCHAP[sn] : 'Regl. (CE) 852/2004 - Hygiene des denrees alimentaires'; }
+    // Référence réglementaire déduite du NOM du chapitre (robuste à la renumérotation tronc commun + spécifique)
+    var _chapName = {};
+    for (var _cq = 0; _cq < questions.length; _cq++) { _chapName[questions[_cq].s] = questions[_cq].name; }
+    function _regForName(name) {
+      var n = (name || '').toUpperCase();
+      if (n.indexOf('DOCUMENT') >= 0 || n.indexOf('PMS') >= 0) return "Regl. (CE) 852/2004 art.5 (PMS/HACCP) - Code rural L.233-4 (formation 14h)";
+      if (n.indexOf('CONTROLE') >= 0 || n.indexOf('CONTRÔLE') >= 0 || n.indexOf('AUTOSURVEILLANCE') >= 0) return "Regl. (CE) 852/2004 Ann.II - Arrete 21/12/2009 (temperatures)";
+      if (n.indexOf('LOCAUX') >= 0 || n.indexOf('MARCHE EN AVANT') >= 0) return "Regl. (CE) 852/2004 Ann.II ch. I-II (locaux, marche en avant)";
+      if (n.indexOf('PERSONNEL') >= 0) return "Regl. (CE) 852/2004 Ann.II ch. VIII (hygiene du personnel)";
+      if (n.indexOf('RECEPTION') >= 0 || n.indexOf('RÉCEPTION') >= 0) return "Regl. (CE) 178/2002 - Arrete 21/12/2009 (T receptions)";
+      if (n.indexOf('FROID') >= 0 || n.indexOf('STOCKAGE') >= 0 || n.indexOf('MATIERES') >= 0 || n.indexOf('MATIÈRES') >= 0) return "Arrete 21/12/2009 (T conservation) - Regl. (CE) 852/2004 Ann.II ch. IX";
+      if (n.indexOf('TRACABILITE') >= 0 || n.indexOf('TRAÇABILITÉ') >= 0) return "Regl. (CE) 178/2002 art.18 (tracabilite) - Regl. (UE) 1169/2011 (INCO/allergenes)";
+      if (n.indexOf('NETTOYAGE') >= 0) return "Regl. (CE) 852/2004 Ann.II ch. I-II-V (nettoyage-desinfection)";
+      if (n.indexOf('NUISIBLE') >= 0) return "Regl. (CE) 852/2004 Ann.II ch. IX (lutte contre les nuisibles)";
+      if (n.indexOf('DECHET') >= 0 || n.indexOf('DÉCHET') >= 0) return "Regl. (CE) 852/2004 Ann.II ch. VI - Loi AGEC (biodechets)";
+      if (n.indexOf('DECOUPE') >= 0 || n.indexOf('DÉCOUPE') >= 0 || n.indexOf('HACHAGE') >= 0 || n.indexOf('ORIGINE VIANDE') >= 0 || n.indexOf('VIANDE') >= 0) return "Regl. (CE) 853/2004 (denrees animales) - Regl. (CE) 1760/2000 (origine viande)";
+      if (n.indexOf('AGREMENT') >= 0 || n.indexOf('AGRÉMENT') >= 0 || n.indexOf('SOUS-PRODUIT') >= 0) return "Regl. (CE) 853/2004 (agrement) - Regl. (CE) 1069/2009 (sous-produits)";
+      if (n.indexOf('PRODUCTION') >= 0 || n.indexOf('CUISSON') >= 0 || n.indexOf('METHODE') >= 0 || n.indexOf('MÉTHODE') >= 0) return "Arrete 08/10/2013 (refroidissement) - Regl. (CE) 2073/2005 (microbio) - CCP HACCP";
+      if (n.indexOf('MATERIEL') >= 0 || n.indexOf('MATÉRIEL') >= 0 || n.indexOf('FOURNIL') >= 0 || n.indexOf('MACHINE') >= 0) return "Regl. (CE) 852/2004 - Regl. (CE) 1935/2004 (materiaux au contact)";
+      if (n.indexOf('VENTE') >= 0 || n.indexOf('PRODUITS FINIS') >= 0 || n.indexOf('SERVICE') >= 0 || n.indexOf('SANDWICH') >= 0 || n.indexOf('CLIENT') >= 0 || n.indexOf('FROIDS') >= 0) return "Regl. (UE) 1169/2011 (INCO/allergenes) - Arrete 21/12/2009";
+      return "Regl. (CE) 852/2004 - Hygiene des denrees alimentaires";
+    }
+    function _regFor(sn){ return _regForName(_chapName[sn] || ''); }
     function _delaiFor(w){ return w === 3 ? 'Immediat - 48 h' : w === 2 ? '7 a 15 jours' : 'Sous 1 mois'; }
     function _prioFor(w){ return w === 3 ? 'CRITIQUE' : w === 2 ? 'MAJEUR' : 'MINEUR'; }
     function _prioColor(w){ return w === 3 ? '#e05252' : w === 2 ? '#e8913a' : '#b79029'; }
