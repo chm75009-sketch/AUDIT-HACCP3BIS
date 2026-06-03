@@ -21,9 +21,15 @@ if ('serviceWorker' in navigator) {
 // ── Bouton « Installer l'application » (PWA) ──
 (function () {
   var deferredPrompt = null;
+  function isInstalled() {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  }
+  function instructions() {
+    alert("Pour installer l'application sur ce PC (Windows 10) :\n\n• Microsoft Edge : menu ··· (en haut à droite) → Applications → « Installer ce site en tant qu'application ».\n• Google Chrome : menu ⋮ → « Installer l'application… », ou l'icône ⊞ dans la barre d'adresse.\n\nUne icône sera créée sur le Bureau et dans le menu Démarrer.");
+  }
   function showInstallBtn() {
     if (!document.body) { document.addEventListener('DOMContentLoaded', showInstallBtn); return; }
-    if (document.getElementById('pwaInstallBtn')) return;
+    if (isInstalled() || document.getElementById('pwaInstallBtn')) return;
     var b = document.createElement('button');
     b.id = 'pwaInstallBtn';
     b.type = 'button';
@@ -31,21 +37,19 @@ if ('serviceWorker' in navigator) {
     b.textContent = "📥 Installer l'application";
     b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:99999;background:#153e35;color:#fff;border:none;border-radius:999px;padding:12px 18px;font-family:\'Source Sans 3\',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.32)';
     b.onclick = function () {
-      if (!deferredPrompt) return;
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(function () { deferredPrompt = null; b.remove(); });
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function () { deferredPrompt = null; b.remove(); });
+      } else {
+        instructions();
+      }
     };
     document.body.appendChild(b);
   }
-  window.addEventListener('beforeinstallprompt', function (e) {
-    e.preventDefault();
-    deferredPrompt = e;
-    showInstallBtn();
-  });
-  window.addEventListener('appinstalled', function () {
-    deferredPrompt = null;
-    var b = document.getElementById('pwaInstallBtn'); if (b) b.remove();
-  });
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredPrompt = e; showInstallBtn(); });
+  window.addEventListener('appinstalled', function () { deferredPrompt = null; var b = document.getElementById('pwaInstallBtn'); if (b) b.remove(); });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showInstallBtn);
+  else showInstallBtn();
 })();
 </script>
 
