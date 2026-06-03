@@ -2,7 +2,7 @@
  * network-first : derniere version en ligne, repli sur le cache hors-ligne.
  * Les CDN externes (polices, emailjs, docx) ne sont pas interceptes.
  */
-const CACHE = 'audit-haccp-boulangerie-v2';
+const CACHE = 'audit-haccp-boulangerie-v3';
 const CORE = [
   './',
   './audit.html',
