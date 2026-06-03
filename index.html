@@ -34,7 +34,7 @@ if ('serviceWorker' in navigator) {
     b.type = 'button';
     b.setAttribute('aria-label', "Installer l'application");
     b.textContent = "📥 Installer l'application";
-    b.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:99999;background:#153e35;color:#fff;border:none;border-radius:999px;padding:12px 18px;font-family:\'Source Sans 3\',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.32)';
+    b.style.cssText = 'position:fixed;right:16px;top:14px;z-index:99999;background:#153e35;color:#fff;border:none;border-radius:999px;padding:11px 18px;font-family:\'Source Sans 3\',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.32)';
     b.onclick = function () {
       if (deferredPrompt) {
         deferredPrompt.prompt();
