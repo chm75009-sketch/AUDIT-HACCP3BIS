@@ -5537,6 +5537,43 @@ function deleteCode(code) {
   refreshAdminTable();
 }
 
+// Coche / décoche toutes les cases de la liste des codes.
+function toggleAllCodeChecks(master) {
+  var boxes = document.querySelectorAll('.code-check');
+  for (var i=0;i<boxes.length;i++) boxes[i].checked = !!(master && master.checked);
+}
+
+// Supprime les codes cochés (cloud + local).
+function deleteSelectedCodes() {
+  var checks = document.querySelectorAll('.code-check:checked');
+  if (!checks.length) { toast('Aucun code sélectionné.', 'err'); return; }
+  var sel = []; for (var i=0;i<checks.length;i++) sel.push(checks[i].value);
+  if (!confirm('Supprimer ' + sel.length + ' code(s) sélectionné(s) ? Action irréversible.')) return;
+  var selSet = {}; sel.forEach(function(c){ selSet[c] = 1; });
+  saveCodes(getCodes().filter(function(c){ return !selSet[c.code]; }));
+  refreshAdminTable();
+  Promise.all(sel.map(function(code){ return deleteCode_remote(code).catch(function(e){ console.error('Supabase delete code:', code, e); }); }))
+    .then(function(){ toast('✓ ' + sel.length + ' code(s) supprimé(s).', 'ok'); refreshAdminTable(); });
+}
+
+// Supprime TOUS les codes d'accès (cloud + local).
+function deleteAllCodes() {
+  var codes = getCodes();
+  if (!codes.length) { toast('Aucun code à supprimer.', 'err'); return; }
+  if (!confirm('⚠️ Supprimer TOUS les ' + codes.length + ' codes d\'accès,\nsur le cloud ET sur cet appareil ?\n\nAction irréversible.')) return;
+  saveCodes([]);
+  refreshAdminTable();
+  if (typeof SUPABASE_URL !== 'undefined' && typeof sbHeaders === 'function') {
+    toast('Suppression des codes en cours…', 'inf');
+    fetch(SUPABASE_URL + '/rest/v1/codes?code=not.is.null', { method:'DELETE', headers: Object.assign({}, sbHeaders(), {'Prefer':'return=minimal'}) })
+      .then(function(r){ if (r.ok) { toast('✓ Tous les codes ont été supprimés.', 'ok'); } else { return r.text().then(function(t){ console.warn('[Codes] suppression refusée', r.status, t); toast('Local vidé. Suppression cloud refusée (' + r.status + ') — supprimez depuis Supabase.', 'err'); }); } })
+      .catch(function(e){ console.warn('[Codes] réseau', e && e.message); toast('Local vidé. Erreur réseau côté cloud.', 'err'); })
+      .then(function(){ refreshAdminTable(); });
+  } else {
+    toast('Codes locaux vidés (cloud indisponible).', 'ok');
+  }
+}
+
 function renewCode(oldCode) {
   var codes = getCodes();
   var original = codes.find(function(c){ return c.code === oldCode; });
@@ -5665,6 +5702,7 @@ function refreshAdminTable() {
     var codeStr = JSON.stringify(c.code).replace(/'/g,"&#39;");
     var infoStr = JSON.stringify(c.info||{}).replace(/'/g,"&#39;").replace(/"/g,"&quot;");
     return '<tr>' +
+      '<td style="text-align:center"><input type="checkbox" class="code-check" value="' + c.code + '" style="width:16px;height:16px;cursor:pointer"></td>' +
       '<td><span class="code-badge">' + c.code + '</span><button class="copy-btn" onclick="copyCode(\''+c.code+'\')">📋 Copier</button></td>' +
       '<td>' + (c.info ? c.info.etab : c.client) + typeLabel + '<br><small style="color:#65716b">' + (c.info ? (c.info.secteur||'') : '') + '</small></td>' +
       '<td>' + status + '</td>' +
@@ -5684,8 +5722,14 @@ function refreshAdminTable() {
       '</td>' +
     '</tr>';
   }).join('');
-  wrap.innerHTML = '<table class="codes-table"><thead><tr>' +
-    '<th>Code</th><th>Client / Secteur</th><th>Statut</th><th>Créé le</th><th>Expire</th><th>Utilisé le</th><th>Documents</th><th></th>' +
+  wrap.innerHTML =
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">' +
+      '<button onclick="deleteSelectedCodes()" style="background:#fdecec;border:1px solid #f5b7b1;border-radius:8px;padding:7px 12px;font-family:\'Source Sans 3\',sans-serif;font-size:.78rem;color:#c0392b;font-weight:600;cursor:pointer">🗑 Supprimer la sélection</button>' +
+      '<button onclick="deleteAllCodes()" style="background:#c0392b;border:1px solid #c0392b;border-radius:8px;padding:7px 12px;font-family:\'Source Sans 3\',sans-serif;font-size:.78rem;color:#fff;font-weight:600;cursor:pointer">🗑 Tout supprimer</button>' +
+      '<span style="font-size:.74rem;color:#8a9e95">Cochez des codes, puis « Supprimer la sélection ».</span>' +
+    '</div>' +
+    '<table class="codes-table"><thead><tr>' +
+    '<th style="width:34px;text-align:center"><input type="checkbox" onclick="toggleAllCodeChecks(this)" title="Tout sélectionner" style="width:16px;height:16px;cursor:pointer"></th><th>Code</th><th>Client / Secteur</th><th>Statut</th><th>Créé le</th><th>Expire</th><th>Utilisé le</th><th>Documents</th><th></th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
