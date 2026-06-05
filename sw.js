@@ -1,8 +1,11 @@
 /* Audit HACCP Boulangerie — Service Worker (PWA)
- * network-first : derniere version en ligne, repli sur le cache hors-ligne.
+ * cache-first + revalidation en arriere-plan (stale-while-revalidate) :
+ * l'app se charge INSTANTANEMENT depuis le cache (meme apres une mise en veille
+ * ou en zone de mauvais reseau), puis se met a jour discretement pour la fois
+ * suivante. Fini l'ecran « hors ligne » fige au reveil pendant un audit.
  * Les CDN externes (polices, emailjs, docx) ne sont pas interceptes.
  */
-const CACHE = 'audit-haccp-boulangerie-v3';
+const CACHE = 'audit-haccp-boulangerie-v4';
 const CORE = [
   './',
   './audit.html',
@@ -35,26 +38,51 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Met a jour le cache en arriere-plan (ne bloque jamais la reponse).
+// Timeout reseau pour ne jamais laisser une requete tirer en longueur.
+function revalidate(req) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 6000);
+  return fetch(req, { signal: ctrl.signal }).then((res) => {
+    clearTimeout(t);
+    if (res && (res.ok || res.type === 'opaque')) {
+      const copy = res.clone();
+      caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+    }
+    return res;
+  }).catch(() => {
+    clearTimeout(t);
+    return null;
+  });
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
 
+  // Navigations (rechargement de la page, retour de veille) :
+  // on sert IMMEDIATEMENT la page en cache si elle existe, puis on revalide
+  // en arriere-plan. Sinon on tente le reseau, avec repli sur l'app shell.
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy));
-        return res;
-      }).catch(() => caches.match(req).then((r) => r || caches.match('./audit.html')))
+      caches.match(req).then((cached) => {
+        if (cached) {
+          revalidate(req); // mise a jour silencieuse pour la prochaine fois
+          return cached;
+        }
+        return revalidate(req).then((res) =>
+          res || caches.match('./audit.html') || caches.match('./index.html')
+        );
+      })
     );
     return;
   }
 
+  // Autres ressources same-origin : cache d'abord, revalidation en arriere-plan.
   event.respondWith(
-    fetch(req).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE).then((c) => c.put(req, copy));
-      return res;
-    }).catch(() => caches.match(req))
+    caches.match(req).then((cached) => {
+      const network = revalidate(req);
+      return cached || network.then((res) => res || cached);
+    })
   );
 });
