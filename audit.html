@@ -4568,6 +4568,14 @@ function onLibreClientPick(val) {
   set('m-aud',  info.auditeur || '');
   if (info.visite) set('m-vis', info.visite);
   if (typeof toast === 'function') toast('👥 Client « ' + (info.etab || c.client) + ' » chargé — modifiable.', 'ok');
+  // Reprise : si un audit a déjà été commencé pour CE client (brouillon rangé
+  // sous « etab:<nom> »), proposer de le récupérer au lieu de repartir à vide.
+  // Indispensable en audit libre : on peut quitter puis re-sélectionner le
+  // même client et retrouver ses saisies. Le délai laisse switchSecteur()
+  // reconstruire les questions avant la réinjection des réponses.
+  setTimeout(function(){
+    if (typeof maybeOfferDraftRecovery === 'function') maybeOfferDraftRecovery();
+  }, 450);
 }
 
 // ── Afficher l'application audit ──
