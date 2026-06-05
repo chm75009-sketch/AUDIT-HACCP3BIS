@@ -726,6 +726,12 @@ body{background:#fff}
           <h3 style="font-size:1rem;font-weight:700;color:#153e35;margin-bottom:6px">Audit libre</h3>
           <p style="font-size:.8rem;color:#65716b;line-height:1.5">Démarrer un audit directement, saisie libre des informations — sans créer ni envoyer de code client</p>
         </div>
+        <!-- Mon équipe -->
+        <div onclick="showTeam()" style="background:#fff;border-radius:14px;padding:28px 24px;box-shadow:0 4px 24px rgba(26,35,50,.08);border:2px solid transparent;cursor:pointer;transition:all .2s;text-align:center;grid-column:1/-1" onmouseover="this.style.borderColor='#2d6f60'" onmouseout="this.style.borderColor='transparent'">
+          <div style="font-size:2.5rem;margin-bottom:12px">👥</div>
+          <h3 style="font-size:1rem;font-weight:700;color:#153e35;margin-bottom:6px">Mon équipe</h3>
+          <p style="font-size:.8rem;color:#65716b;line-height:1.5">Créer l'équipe d'auditeurs et choisir qui réalise l'audit — synchronisé sur tous vos appareils</p>
+        </div>
       </div>
       <div style="text-align:center">
         <button onclick="showAdminPanel()" style="background:none;border:1px solid #dfe6e0;border-radius:8px;padding:10px 20px;font-family:'Source Sans 3',sans-serif;font-size:.83rem;color:#65716b;cursor:pointer">⚙️ Panneau d'administration</button>
@@ -856,6 +862,42 @@ body{background:#fff}
       </div>
     </div>
   </div>
+
+  <!-- ÉCRAN MON ÉQUIPE (auditeurs) -->
+  <div id="adminTeamScreen" style="display:none;background:#f5f2ea;min-height:calc(100vh - 58px);padding:24px 16px">
+    <div style="max-width:700px;margin:0 auto">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+        <button onclick="showAdminChoix()" style="background:#fff;border:1px solid #dfe6e0;border-radius:8px;padding:8px 14px;font-family:'Source Sans 3',sans-serif;font-size:.82rem;color:#65716b;cursor:pointer">← Retour</button>
+        <h2 style="font-family:'Playfair Display',Georgia,serif;font-size:1.3rem;color:#153e35">Mon équipe</h2>
+      </div>
+      <div class="admin-section">
+        <div id="teamFormTitre" style="font-weight:700;color:#153e35;font-size:.95rem;margin-bottom:14px">➕ Ajouter un auditeur</div>
+        <div style="display:flex;gap:14px;align-items:flex-start">
+          <div style="flex-shrink:0;text-align:center">
+            <label for="teamPhotoInput" style="cursor:pointer;display:block">
+              <div id="teamPhotoPreview" style="width:64px;height:64px;border-radius:50%;background:#f0faf8;border:2px dashed rgba(45,111,96,.4);display:flex;align-items:center;justify-content:center;overflow:hidden"><span style="font-size:1.4rem">📷</span></div>
+              <div style="font-size:.62rem;color:#2d6f60;font-weight:700;margin-top:4px">Photo (option)</div>
+            </label>
+            <input type="file" id="teamPhotoInput" accept="image/*" style="display:none" onchange="previewTeamPhoto(this)">
+          </div>
+          <div style="flex:1">
+            <div class="gen-field" style="margin-bottom:10px"><label>Prénom</label><input type="text" id="teamPrenom" placeholder="Ex : Marie"></div>
+            <div class="gen-field"><label>Nom</label><input type="text" id="teamNom" placeholder="Ex : Martin"></div>
+          </div>
+        </div>
+        <button id="teamSubmitBtn" class="gen-btn" onclick="teamAdd()" style="width:100%;margin-top:14px;padding:12px;background:#2d6f60">Enregistrer</button>
+        <button id="teamCancelBtn" onclick="teamCancelEdit()" style="display:none;width:100%;margin-top:8px;padding:10px;background:#f5f2ea;border:1px solid #dfe6e0;border-radius:8px;color:#65716b;font-family:'Source Sans 3',sans-serif;font-size:.85rem;cursor:pointer">Annuler la modification</button>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 2px 10px">
+        <div style="font-size:.7rem;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#8a9e95">Équipe d'auditeurs</div>
+        <div style="font-size:.72rem;font-weight:800;color:#2d6f60;background:#f0faf8;padding:2px 9px;border-radius:20px"><span id="teamCount">0</span> personne(s)</div>
+      </div>
+      <button onclick="syncTeamManual()" style="width:100%;margin-bottom:12px;background:#f0faf8;border:1px solid rgba(45,111,96,.3);color:#1f5649;border-radius:10px;padding:11px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:'Source Sans 3',sans-serif">🔄 Synchroniser sur tous mes appareils</button>
+      <div id="teamListe"></div>
+    </div>
+  </div>
+
   <div class="admin-wrap">
     <div class="admin-section">
       <h2><span style="background:#153e35;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:.7rem">📊</span>&nbsp; Tableau de bord</h2>
@@ -4086,7 +4128,7 @@ function loginClient() {
 function showAdminChoix() {
   document.getElementById('adminPanel').style.display = 'block';
   // Cacher tous les sous-écrans
-  ['adminChoixScreen','adminNouveauClientScreen','adminClientExistantScreen'].forEach(function(id){
+  ['adminChoixScreen','adminNouveauClientScreen','adminClientExistantScreen','adminTeamScreen'].forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -4113,7 +4155,7 @@ function showAdmin() {
 
 function showAdminPanel() {
   document.getElementById('adminPanel').style.display = 'block';
-  ['adminChoixScreen','adminNouveauClientScreen','adminClientExistantScreen'].forEach(function(id){
+  ['adminChoixScreen','adminNouveauClientScreen','adminClientExistantScreen','adminTeamScreen'].forEach(function(id){
     var el = document.getElementById(id); if(el) el.style.display='none';
   });
   document.getElementById('authScreen').style.display = 'none';
@@ -4134,7 +4176,7 @@ function showAdminPanel() {
 }
 
 function showNouveauClient() {
-  ['adminChoixScreen','adminClientExistantScreen'].forEach(function(id){
+  ['adminChoixScreen','adminClientExistantScreen','adminTeamScreen'].forEach(function(id){
     var el = document.getElementById(id); if(el) el.style.display='none';
   });
   document.getElementById('adminNouveauClientScreen').style.display='block';
@@ -4145,7 +4187,7 @@ function showNouveauClient() {
 }
 
 function showClientExistant() {
-  ['adminChoixScreen','adminNouveauClientScreen'].forEach(function(id){
+  ['adminChoixScreen','adminNouveauClientScreen','adminTeamScreen'].forEach(function(id){
     var el = document.getElementById(id); if(el) el.style.display='none';
   });
   document.getElementById('adminClientExistantScreen').style.display='block';
@@ -4615,6 +4657,8 @@ function showApp(role) {
       '<button class="tb tb-new" onclick="logout()">⏻ Quitter</button>';
   }
   initApp();
+  // Proposer les auditeurs de l'équipe dans le champ « Auditeur » (datalist).
+  if (typeof syncTeamDatalist === 'function') { try { syncTeamDatalist(); } catch(e){} }
 }
 
 function retourWelcomeDepuisAudit() {
@@ -8217,6 +8261,8 @@ function loadAudits_remote() {
   fetch(SUPABASE_URL + '/rest/v1/audits?order=created_at.desc&limit=50', {
     headers: sbHeaders()
   }).then(function(r) { return r.json(); }).then(function(rows) {
+    // Exclure les lignes techniques du registre d'équipe (stockées dans la même table).
+    if (Array.isArray(rows)) rows = rows.filter(function(a){ return a.client_code !== '__EQUIPE__' && a.etab !== '__EQUIPE__'; });
     if (!Array.isArray(rows) || !rows.length) {
       wrap.innerHTML = '<div style="font-size:.82rem;color:#8a9e95;text-align:center;padding:16px">Aucun audit sauvegardé.</div>';
       return;
@@ -9108,5 +9154,160 @@ function saveEditClient() {
   </div>
 </div>
 
+<script>
+/* ════════════════════════════════════════════════════════════════════════
+   MODULE ÉQUIPE (auditeurs) — synchronisation multi-appareils + choix de
+   l'auditeur. Réutilise la table Supabase « audits » (aucune nouvelle table) :
+   une ligne marquée client_code='__EQUIPE__' stocke l'équipe dans la colonne
+   JSON « sels », avec l'horodatage de mise à jour dans « obs1 ». Fusion
+   « dernier écrit gagne ». Les lignes équipe sont exclues de l'historique.
+   ════════════════════════════════════════════════════════════════════════ */
+var TEAM_KEY = 'haccp_team_members';
+var TEAM_MAJ_KEY = 'haccp_team_maj';
+var TEAM_MARQUEUR = '__EQUIPE__';
+var _teamPhotoTmp = '';
+var _editingTeamId = null;
+var _pushTeamTimer = null;
+
+function _teamEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function _teamToast(m,t){ if(typeof toast==='function') toast(m, t||'inf'); }
+
+function getTeam(){ try{ var a=JSON.parse(localStorage.getItem(TEAM_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+function _saveTeamRaw(a){ try{ localStorage.setItem(TEAM_KEY, JSON.stringify(a||[])); }catch(e){} }
+function getTeamMaj(){ try{ var v=localStorage.getItem(TEAM_MAJ_KEY); return v?(Number(v)||0):0; }catch(e){ return 0; } }
+function setTeamMaj(t){ try{ localStorage.setItem(TEAM_MAJ_KEY, String(t||Date.now())); }catch(e){} }
+function saveTeam(a){ _saveTeamRaw(a); setTeamMaj(Date.now()); scheduleTeamPush(); }
+
+function _teamCloudReady(){ return typeof SUPABASE_URL!=='undefined' && typeof sbHeaders==='function'; }
+function scheduleTeamPush(){ if(_pushTeamTimer) clearTimeout(_pushTeamTimer); _pushTeamTimer=setTimeout(function(){ _pushTeamTimer=null; pushTeamCloud(); },800); }
+
+function pushTeamCloud(){
+  if(!_teamCloudReady()) return Promise.resolve({ok:false,msg:'Cloud indisponible'});
+  var membres=getTeam(); var maj=getTeamMaj(); if(!maj){ maj=Date.now(); setTeamMaj(maj); }
+  var body={ etab:TEAM_MARQUEUR, resp:'', auditeur:'', secteur:'', date_audit:'', score:null, visite:'', adresse:'', tel:'', email:'', siret:'', client_code:TEAM_MARQUEUR, role:'__equipe__', sels:membres, obs1:String(maj), obs2:'', rapport_html:'' };
+  return fetch(SUPABASE_URL+'/rest/v1/audits',{ method:'POST', headers:Object.assign({},sbHeaders(),{'Prefer':'return=minimal'}), body:JSON.stringify(body) })
+    .then(function(r){ if(!r.ok){ return r.text().then(function(t){ console.warn('[Équipe] push échec',r.status,t); return {ok:false,status:r.status,body:t,msg:'Erreur '+r.status}; }); } return {ok:true,count:membres.length}; })
+    .catch(function(e){ return {ok:false,msg:(e&&e.message)||'Erreur réseau'}; });
+}
+
+function pullTeamCloud(){
+  if(!_teamCloudReady()) return Promise.resolve({ok:false,msg:'Cloud indisponible'});
+  var url=SUPABASE_URL+'/rest/v1/audits?client_code=eq.'+encodeURIComponent(TEAM_MARQUEUR)+'&order=created_at.desc&limit=1';
+  return fetch(url,{ headers:sbHeaders() })
+    .then(function(r){ if(!r.ok){ return r.text().then(function(t){ return {__err:true,ok:false,status:r.status,body:t,msg:'Erreur '+r.status}; }); } return r.json(); })
+    .then(function(res){
+      if(res && res.__err) return res;
+      var rows=res;
+      if(!Array.isArray(rows)||!rows.length){ if(getTeam().length) scheduleTeamPush(); return {ok:true,empty:true,count:0,adopted:false}; }
+      var row=rows[0];
+      var membres = Array.isArray(row.sels) ? row.sels : (typeof row.sels==='string' ? (function(){ try{ return JSON.parse(row.sels); }catch(e){ return []; } })() : []);
+      if(!Array.isArray(membres)) membres=[];
+      var cloudMaj = Number(row.obs1) || (row.created_at ? new Date(row.created_at).getTime() : 0);
+      var localMaj = getTeamMaj();
+      if(cloudMaj>localMaj){ _saveTeamRaw(membres); setTeamMaj(cloudMaj); renderTeam(); syncTeamDatalist(); return {ok:true,count:membres.length,adopted:true}; }
+      if(localMaj>cloudMaj && getTeam().length) scheduleTeamPush();
+      return {ok:true,count:membres.length,adopted:false};
+    })
+    .catch(function(e){ return {ok:false,msg:(e&&e.message)||'Erreur réseau'}; });
+}
+
+function syncTeamManual(){
+  if(!_teamCloudReady()){ _teamToast('Synchronisation indisponible (cloud non joignable).','err'); return; }
+  _teamToast('Synchronisation de l\'équipe…','inf');
+  pullTeamCloud().then(function(p){
+    pushTeamCloud().then(function(q){
+      renderTeam(); syncTeamDatalist();
+      if(q&&q.ok){ _teamToast('✓ Équipe synchronisée sur tous vos appareils ('+(q.count||0)+').','ok'); }
+      else if(p&&p.ok&&p.adopted){ _teamToast('✓ Équipe récupérée depuis le cloud ('+(p.count||0)+').','ok'); }
+      else { var why=(q&&(q.body||q.msg))||(p&&(p.body||p.msg))||'cause inconnue'; _teamToast('⚠️ Échec synchro — '+String(why).slice(0,120),'err'); }
+    });
+  });
+}
+
+function showTeam(){
+  document.getElementById('adminPanel').style.display='block';
+  ['adminChoixScreen','adminNouveauClientScreen','adminClientExistantScreen','adminTeamScreen'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display='none'; });
+  document.getElementById('authScreen').style.display='none';
+  document.getElementById('appMain').style.display='none';
+  var t=document.getElementById('adminTeamScreen'); if(t) t.style.display='block';
+  _resetTeamForm(); renderTeam(); pullTeamCloud();
+}
+
+function renderTeam(){
+  var host=document.getElementById('teamListe'); if(!host) return;
+  var membres=getTeam();
+  if(!membres.length){
+    host.innerHTML='<div style="text-align:center;color:#8a9e95;font-size:.85rem;padding:24px 12px"><div style="font-size:2rem;margin-bottom:8px">👥</div>Aucun auditeur enregistré.<br>Ajoutez les membres de votre équipe ci-dessus.</div>';
+  } else {
+    host.innerHTML=membres.map(function(m){
+      var nom=((m.prenom||'')+' '+(m.nom||'')).trim();
+      var ini=((m.prenom||' ')[0]+(m.nom||' ')[0]).toUpperCase();
+      var av=m.photo ? '<img src="'+m.photo+'" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0">' : '<div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#2d6f60,#153e35);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.9rem;flex-shrink:0">'+_teamEsc(ini)+'</div>';
+      return '<div style="background:#fff;border:1px solid #dfe6e0;border-radius:12px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:12px">'+av+
+        '<div style="flex:1;min-width:0"><div style="font-weight:700;color:#153e35;font-size:.9rem">'+_teamEsc(nom)+'</div></div>'+
+        '<button onclick="teamEdit(\''+m.id+'\')" title="Modifier" style="background:#f0faf8;border:1px solid rgba(45,111,96,.3);color:#1f5649;border-radius:8px;width:32px;height:32px;font-size:.85rem;cursor:pointer;flex-shrink:0">✏️</button>'+
+        '<button onclick="teamDelete(\''+m.id+'\')" title="Supprimer" style="background:#fdecec;border:1px solid #f5b7b1;color:#c0392b;border-radius:8px;width:32px;height:32px;font-size:.9rem;cursor:pointer;flex-shrink:0">🗑</button>'+
+      '</div>';
+    }).join('');
+  }
+  var cnt=document.getElementById('teamCount'); if(cnt) cnt.textContent=membres.length;
+  syncTeamDatalist();
+}
+
+function previewTeamPhoto(input){
+  var f=input.files&&input.files[0]; if(!f) return;
+  var apply=function(d){ _teamPhotoTmp=d; var p=document.getElementById('teamPhotoPreview'); if(p) p.innerHTML='<img src="'+d+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'; };
+  if(typeof compressImage==='function') compressImage(f, function(d){ apply(d); });
+  else { var rd=new FileReader(); rd.onload=function(e){ apply(e.target.result); }; rd.readAsDataURL(f); }
+}
+
+function _resetTeamForm(){
+  var p=document.getElementById('teamPrenom'), n=document.getElementById('teamNom');
+  if(p) p.value=''; if(n) n.value=''; _teamPhotoTmp=''; _editingTeamId=null;
+  var pv=document.getElementById('teamPhotoPreview'); if(pv) pv.innerHTML='<span style="font-size:1.4rem">📷</span>';
+  var fi=document.getElementById('teamPhotoInput'); if(fi) fi.value='';
+  var ti=document.getElementById('teamFormTitre'); if(ti) ti.textContent='➕ Ajouter un auditeur';
+  var bt=document.getElementById('teamSubmitBtn'); if(bt) bt.textContent='Enregistrer';
+  var cb=document.getElementById('teamCancelBtn'); if(cb) cb.style.display='none';
+}
+
+function teamAdd(){
+  var p=document.getElementById('teamPrenom'), n=document.getElementById('teamNom');
+  var prenom=p?p.value.trim():'', nom=n?n.value.trim():'';
+  if(!prenom&&!nom){ _teamToast('Indiquez au moins un nom ou un prénom.','err'); return; }
+  var membres=getTeam();
+  if(_editingTeamId){
+    membres=membres.map(function(m){ return m.id===_editingTeamId ? {id:m.id,prenom:prenom,nom:nom,photo:_teamPhotoTmp||''} : m; });
+    saveTeam(membres); _resetTeamForm(); renderTeam(); _teamToast('Auditeur modifié.','ok'); return;
+  }
+  membres.push({ id:'a'+Date.now()+Math.floor(Math.random()*1000), prenom:prenom, nom:nom, photo:_teamPhotoTmp||'' });
+  saveTeam(membres); _resetTeamForm(); renderTeam(); _teamToast('Auditeur ajouté à l\'équipe.','ok');
+}
+
+function teamEdit(id){
+  var m=getTeam().filter(function(x){ return x.id===id; })[0]; if(!m) return;
+  _editingTeamId=id;
+  var p=document.getElementById('teamPrenom'), n=document.getElementById('teamNom');
+  if(p) p.value=m.prenom||''; if(n) n.value=m.nom||''; _teamPhotoTmp=m.photo||'';
+  var pv=document.getElementById('teamPhotoPreview'); if(pv) pv.innerHTML=m.photo ? '<img src="'+m.photo+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' : '<span style="font-size:1.4rem">📷</span>';
+  var ti=document.getElementById('teamFormTitre'); if(ti){ ti.textContent='✏️ Modifier l\'auditeur'; if(ti.scrollIntoView) try{ ti.scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){} }
+  var bt=document.getElementById('teamSubmitBtn'); if(bt) bt.textContent='Enregistrer les modifications';
+  var cb=document.getElementById('teamCancelBtn'); if(cb) cb.style.display='block';
+}
+
+function teamDelete(id){ if(_editingTeamId===id) _resetTeamForm(); saveTeam(getTeam().filter(function(m){ return m.id!==id; })); renderTeam(); }
+function teamCancelEdit(){ _resetTeamForm(); }
+
+function syncTeamDatalist(){
+  try{
+    var noms=getTeam().map(function(m){ return ((m.prenom||'')+' '+(m.nom||'')).trim(); }).filter(function(x){ return x; });
+    var dl=document.getElementById('equipeAuditeurs');
+    if(!dl){ dl=document.createElement('datalist'); dl.id='equipeAuditeurs'; document.body.appendChild(dl); }
+    var seen={},out=[]; noms.forEach(function(v){ if(v&&!seen[v]){ seen[v]=1; out.push(v); } });
+    dl.innerHTML=out.map(function(v){ return '<option value="'+_teamEsc(v)+'"></option>'; }).join('');
+    ['m-aud','ci_auditeur'].forEach(function(id){ var el=document.getElementById(id); if(el) try{ el.setAttribute('list','equipeAuditeurs'); }catch(e){} });
+  }catch(e){}
+}
+</script>
 </body>
 </html>
