@@ -26,23 +26,44 @@ if ('serviceWorker' in navigator) {
   }
   function instructions() {
     var ua = navigator.userAgent || '';
-    if (/Firefox\//.test(ua) && !/Seamonkey/.test(ua)) {
-      alert("Firefox (sur PC) ne permet pas d'installer les applications web.\n\nPour installer l'application sur votre PC, ouvrez ce même site dans Microsoft Edge (déjà présent sur Windows 10) ou Google Chrome, puis :\n• Edge : menu ··· → Applications → « Installer ce site en tant qu'application ».\n• Chrome : menu ⋮ → « Installer l'application… ».\n\n(Dans Firefox, vous pouvez seulement créer un raccourci : faites glisser l'adresse du site, à gauche de la barre d'adresse, vers le Bureau.)");
+    var isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var isAndroid = /Android/.test(ua);
+    var isFirefox = /Firefox\//.test(ua) || /FxiOS\//.test(ua);
+    var isInApp = /FBAN|FBAV|FB_IAB|Instagram|Messenger|Line\//.test(ua);
+    var isSafari = !isInApp && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS|Chrome\//.test(ua);
+    if (isIOS) {
+      if (isSafari) {
+        alert("Pour installer l'application sur votre iPhone/iPad :\n\n1. Appuyez sur l'icône Partager (le carré avec une flèche vers le haut, en bas de l'écran).\n2. Faites défiler puis choisissez « Sur l'écran d'accueil ».\n3. Appuyez sur « Ajouter ».\n\nL'icône apparaîtra comme une véritable application.");
+      } else {
+        alert("Sur iPhone/iPad, l'installation n'est possible que depuis Safari" + (isFirefox ? " (Firefox ne peut pas installer d'application sur iOS)." : ".") + "\n\n1. Ouvrez ce site dans Safari" + (isInApp ? " (menu de l'application → « Ouvrir dans Safari », ou copiez le lien et collez-le dans Safari)" : " (copiez le lien et collez-le dans Safari)") + ".\n2. Appuyez sur Partager → « Sur l'écran d'accueil » → « Ajouter ».");
+      }
+      return;
+    }
+    if (isAndroid) {
+      if (isFirefox) {
+        alert("Pour installer l'application avec Firefox (Android) :\n\nMenu ⋮ (en haut à droite) → « Installer » (ou « Ajouter à l'écran d'accueil »).");
+      } else if (isInApp) {
+        alert("Pour installer l'application :\n\n1. Ouvrez ce site dans Chrome (menu de l'application → « Ouvrir dans le navigateur », ou collez le lien dans Chrome).\n2. Menu ⋮ → « Installer l'application ».");
+      } else {
+        alert("Pour installer l'application sur Android :\n\nMenu ⋮ (en haut à droite) → « Installer l'application » (ou « Ajouter à l'écran d'accueil »).");
+      }
+      return;
+    }
+    if (isFirefox) {
+      alert("Firefox (sur PC) ne permet pas d'installer les applications web.\n\nPour installer l'application, ouvrez ce même site dans Microsoft Edge (déjà présent sur Windows 10) ou Google Chrome, puis :\n• Edge : menu ··· → Applications → « Installer ce site en tant qu'application ».\n• Chrome : menu ⋮ → « Installer l'application… ».");
       return;
     }
     alert("Pour installer l'application sur ce PC (Windows 10) :\n\n• Microsoft Edge : menu ··· (en haut à droite) → Applications → « Installer ce site en tant qu'application ».\n• Google Chrome : menu ⋮ → « Installer l'application… », ou l'icône ⊞ dans la barre d'adresse.\n\nUne icône sera créée sur le Bureau et dans le menu Démarrer.");
   }
   function showInstallBtn() {
     if (!document.body) { document.addEventListener('DOMContentLoaded', showInstallBtn); return; }
-    // Firefox (PC) ne sait pas installer de PWA → ne pas afficher de bouton trompeur
-    if (/Firefox\//.test(navigator.userAgent || '') && !/Seamonkey/.test(navigator.userAgent || '')) return;
     if (isInstalled() || document.getElementById('pwaInstallBtn')) return;
     var b = document.createElement('button');
     b.id = 'pwaInstallBtn';
     b.type = 'button';
     b.setAttribute('aria-label', "Installer l'application");
     b.textContent = "📥 Installer l'application";
-    b.style.cssText = 'position:fixed;right:16px;top:14px;z-index:99999;background:#153e35;color:#fff;border:none;border-radius:999px;padding:11px 18px;font-family:\'Source Sans 3\',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.32)';
+    b.style.cssText = 'position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:99999;background:#153e35;color:#fff;border:none;border-radius:999px;padding:11px 18px;font-family:\'Source Sans 3\',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.32)';
     b.onclick = function () {
       if (deferredPrompt) {
         deferredPrompt.prompt();
