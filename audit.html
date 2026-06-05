@@ -9173,7 +9173,10 @@ function _teamEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(
 function _teamToast(m,t){ if(typeof toast==='function') toast(m, t||'inf'); }
 
 function getTeam(){ try{ var a=JSON.parse(localStorage.getItem(TEAM_KEY)||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
-function _saveTeamRaw(a){ try{ localStorage.setItem(TEAM_KEY, JSON.stringify(a||[])); }catch(e){} }
+function _saveTeamRaw(a){
+  try{ localStorage.setItem(TEAM_KEY, JSON.stringify(a||[])); return true; }
+  catch(e){ _teamToast('Espace de stockage plein — réduisez la taille des photos.','err'); console.warn('[Équipe] localStorage plein:', e && e.message); return false; }
+}
 function getTeamMaj(){ try{ var v=localStorage.getItem(TEAM_MAJ_KEY); return v?(Number(v)||0):0; }catch(e){ return 0; } }
 function setTeamMaj(t){ try{ localStorage.setItem(TEAM_MAJ_KEY, String(t||Date.now())); }catch(e){} }
 function saveTeam(a){ _saveTeamRaw(a); setTeamMaj(Date.now()); scheduleTeamPush(); }
@@ -9224,13 +9227,49 @@ function syncTeamManual(){
   });
 }
 
+// Recompresse une dataURL trop lourde (héritée d'une version sans compression).
+function _teamShrinkDataUrl(dataUrl, cb){
+  try{
+    var img=new Image();
+    img.onload=function(){
+      try{
+        var max=512, w=img.width, h=img.height;
+        if(w>h && w>max){ h=Math.round(h*max/w); w=max; }
+        else if(h>=w && h>max){ w=Math.round(w*max/h); h=max; }
+        var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        cb(cv.toDataURL('image/jpeg',0.6));
+      }catch(e){ cb(null); }
+    };
+    img.onerror=function(){ cb(null); };
+    img.src=dataUrl;
+  }catch(e){ cb(null); }
+}
+
+// Migration : recompresse les photos existantes > ~200 Ko pour libérer le
+// localStorage (anciens enregistrements faits avant la correction).
+function _teamShrinkExisting(){
+  var membres=getTeam(); var pending=0, changed=false, finished=false;
+  function done(){
+    if(finished) return;
+    if(pending===0){ finished=true; if(changed){ _saveTeamRaw(membres); setTeamMaj(Date.now()); renderTeam(); scheduleTeamPush(); } }
+  }
+  membres.forEach(function(m){
+    if(m.photo && m.photo.length>200000){
+      pending++;
+      _teamShrinkDataUrl(m.photo, function(small){ if(small && small.length<m.photo.length){ m.photo=small; changed=true; } pending--; done(); });
+    }
+  });
+  done();
+}
+
 function showTeam(){
   document.getElementById('adminPanel').style.display='block';
   ['adminChoixScreen','adminNouveauClientScreen','adminClientExistantScreen','adminTeamScreen'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display='none'; });
   document.getElementById('authScreen').style.display='none';
   document.getElementById('appMain').style.display='none';
   var t=document.getElementById('adminTeamScreen'); if(t) t.style.display='block';
-  _resetTeamForm(); renderTeam(); pullTeamCloud();
+  _resetTeamForm(); renderTeam(); _teamShrinkExisting(); pullTeamCloud();
 }
 
 function renderTeam(){
@@ -9254,11 +9293,36 @@ function renderTeam(){
   syncTeamDatalist();
 }
 
+// Compression d'image dédiée au module équipe (la compressImage de l'app est
+// locale à une autre IIFE, donc inaccessible ici). Redimensionne à 512px max,
+// JPEG qualité 0,6 → photos légères (~quelques dizaines de Ko), indispensables
+// pour ne pas saturer le localStorage ni l'envoi cloud.
+function _teamCompressPhoto(file, cb){
+  try{
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var img=new Image();
+      img.onload=function(){
+        try{
+          var max=512, w=img.width, h=img.height;
+          if(w>h && w>max){ h=Math.round(h*max/w); w=max; }
+          else if(h>=w && h>max){ w=Math.round(w*max/h); h=max; }
+          var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+          cv.getContext('2d').drawImage(img,0,0,w,h);
+          cb(cv.toDataURL('image/jpeg',0.6));
+        }catch(err){ cb(e.target.result); }
+      };
+      img.onerror=function(){ cb(e.target.result); };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }catch(e){ if(typeof cb==='function') cb(''); }
+}
+
 function previewTeamPhoto(input){
   var f=input.files&&input.files[0]; if(!f) return;
-  var apply=function(d){ _teamPhotoTmp=d; var p=document.getElementById('teamPhotoPreview'); if(p) p.innerHTML='<img src="'+d+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'; };
-  if(typeof compressImage==='function') compressImage(f, function(d){ apply(d); });
-  else { var rd=new FileReader(); rd.onload=function(e){ apply(e.target.result); }; rd.readAsDataURL(f); }
+  var apply=function(d){ _teamPhotoTmp=d||''; var p=document.getElementById('teamPhotoPreview'); if(p&&d) p.innerHTML='<img src="'+d+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'; };
+  _teamCompressPhoto(f, apply);
 }
 
 function _resetTeamForm(){
