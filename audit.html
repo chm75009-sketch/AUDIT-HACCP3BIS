@@ -951,7 +951,10 @@ body{background:#fff}
     <div class="admin-section">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <h2 style="margin:0"><span style="background:#153e35;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:.7rem">🗂️</span>&nbsp; Historique des audits</h2>
-        <button onclick="loadAudits_remote()" style="background:#fff;border:1px solid #dfe6e0;border-radius:8px;padding:7px 14px;font-family:'Source Sans 3',sans-serif;font-size:.8rem;color:#1f5649;font-weight:600;cursor:pointer">🔄 Actualiser</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="loadAudits_remote()" style="background:#fff;border:1px solid #dfe6e0;border-radius:8px;padding:7px 14px;font-family:'Source Sans 3',sans-serif;font-size:.8rem;color:#1f5649;font-weight:600;cursor:pointer">🔄 Actualiser</button>
+          <button onclick="viderHistoriqueAudits()" title="Supprimer tous les audits et photos (cloud + local) — l'équipe est conservée" style="background:#fdecec;border:1px solid #f5b7b1;border-radius:8px;padding:7px 14px;font-family:'Source Sans 3',sans-serif;font-size:.8rem;color:#c0392b;font-weight:600;cursor:pointer">🗑 Vider photos &amp; historique</button>
+        </div>
       </div>
       <p style="font-size:.8rem;color:#65716b;margin:6px 0 12px">Audits enregistrés (cloud). Cliquez « 📋 Détail » pour consulter, modifier ou télécharger un rapport professionnel.</p>
       <div id="auditsWrap"><div style="font-size:.82rem;color:#8a9e95;text-align:center;padding:16px">⏳ Chargement…</div></div>
@@ -9371,6 +9374,35 @@ function syncTeamDatalist(){
     dl.innerHTML=out.map(function(v){ return '<option value="'+_teamEsc(v)+'"></option>'; }).join('');
     ['m-aud','ci_auditeur'].forEach(function(id){ var el=document.getElementById(id); if(el) try{ el.setAttribute('list','equipeAuditeurs'); }catch(e){} });
   }catch(e){}
+}
+
+// Vide TOUS les audits (rapports + photos) côté cloud ET en local, en
+// préservant le registre d'équipe (lignes etab='__EQUIPE__'). Les photos
+// d'audit étant stockées en base64 dans la colonne rapport_html de la table
+// « audits », supprimer ces lignes supprime bien les photos.
+function viderHistoriqueAudits(){
+  if(!confirm('⚠️ Effacer TOUS les audits enregistrés (rapports + photos),\nsur le cloud ET sur cet appareil ?\n\n• Votre équipe d\'auditeurs est conservée.\n• Action irréversible.\n\nContinuer ?')) return;
+  // 1) Copies locales (historique + brouillons)
+  try{ localStorage.removeItem('hh'); }catch(e){}
+  try{
+    var aSuppr=[]; for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(k && k.indexOf('haccp_draft_')===0) aSuppr.push(k); }
+    aSuppr.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
+  }catch(e){}
+  // 2) Cloud (sauf le registre d'équipe)
+  if(typeof SUPABASE_URL==='undefined' || typeof sbHeaders!=='function'){
+    _teamToast('Historique local vidé (cloud indisponible).','ok');
+    if(typeof loadAudits_remote==='function') loadAudits_remote();
+    return;
+  }
+  _teamToast('Suppression des audits en cours…','inf');
+  var url=SUPABASE_URL+'/rest/v1/audits?or=(etab.neq.'+encodeURIComponent('__EQUIPE__')+',etab.is.null)';
+  fetch(url, { method:'DELETE', headers: Object.assign({}, sbHeaders(), {'Prefer':'return=minimal'}) })
+    .then(function(r){
+      if(r.ok){ _teamToast('✓ Tous les audits et photos ont été supprimés.','ok'); }
+      else { return r.text().then(function(t){ console.warn('[Vider audits] HTTP',r.status,t); _teamToast('Local vidé. Suppression cloud refusée ('+r.status+') — supprimez depuis Supabase.','err'); }); }
+    })
+    .catch(function(e){ console.warn('[Vider audits] réseau',e&&e.message); _teamToast('Local vidé. Erreur réseau côté cloud.','err'); })
+    .then(function(){ if(typeof loadAudits_remote==='function') loadAudits_remote(); });
 }
 </script>
 </body>

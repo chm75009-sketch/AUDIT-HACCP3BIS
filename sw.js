@@ -5,7 +5,7 @@
  * suivante. Fini l'ecran « hors ligne » fige au reveil pendant un audit.
  * Les CDN externes (polices, emailjs, docx) ne sont pas interceptes.
  */
-const CACHE = 'audit-haccp-boulangerie-v6';
+const CACHE = 'audit-haccp-boulangerie-v7';
 const CORE = [
   './',
   './audit.html',
