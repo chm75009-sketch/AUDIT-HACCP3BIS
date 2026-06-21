@@ -1020,7 +1020,16 @@ var quizQuestions = [
       var valMsg = getEl('email-validation');
       if (valMsg) {
         var p = valMsg.querySelector('p');
-        if (p) p.innerHTML = 'Un email de validation vient d\'être envoyé à <strong>' + em.value.trim() + '</strong>.<br>Vérifiez votre boîte mail et saisissez le code reçu.';
+        if (p) {
+          // Email injecté via textContent (anti-XSS) : impossible d'interpréter du HTML.
+          p.textContent = 'Un email de validation vient d\'être envoyé à ';
+          var _strong = document.createElement('strong');
+          _strong.textContent = em.value.trim();
+          p.appendChild(_strong);
+          p.appendChild(document.createTextNode('.'));
+          p.appendChild(document.createElement('br'));
+          p.appendChild(document.createTextNode('Vérifiez votre boîte mail et saisissez le code reçu.'));
+        }
       }
     }
 
