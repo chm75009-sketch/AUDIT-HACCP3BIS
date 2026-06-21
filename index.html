@@ -1495,10 +1495,10 @@ function _adminCheck(pwd, cb) {
     }).then(function (res) {
       cb(res === true, false);
     }).catch(function () {
-      cb(pwd === getAdminPwd(), true);   // repli local (anti-blocage hors ligne)
+      cb(false, true);   // SECURITE : acces admin REFUSE hors-ligne (fail-closed, plus de repli 826700)
     });
   } catch (e) {
-    cb(pwd === getAdminPwd(), true);
+    cb(false, true);
   }
 }
 
