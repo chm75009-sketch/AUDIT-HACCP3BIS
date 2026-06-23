@@ -861,7 +861,7 @@ html,body{background:#f5f2ea;font-family:'Source Sans 3',Arial,sans-serif;color:
         </div>
         <div>
           <h4 style="margin-bottom:10px;color:#153e35;font-size:.88rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Légal</h4>
-          <p style="color:#65716b;font-size:.88rem;line-height:1.8;margin:0">SIRET : 44424477600019<br><button onclick="showMentionsLegales()" style="background:none;border:none;color:#65716b;font-size:.88rem;cursor:pointer;padding:0;font-family:'Source Sans 3',sans-serif;text-decoration:underline">Mentions légales</button><br><button onclick="showPolitiqueConfidentialite()" style="background:none;border:none;color:#65716b;font-size:.88rem;cursor:pointer;padding:0;font-family:'Source Sans 3',sans-serif;text-decoration:underline">Politique de confidentialité</button></p>
+          <p style="color:#65716b;font-size:.88rem;line-height:1.8;margin:0">SIRET : 44424477600019<br><a href="mentions.html" style="color:#65716b;text-decoration:underline">Mentions légales</a><br><a href="politique-confidentialite.html" style="color:#65716b;text-decoration:underline">Politique de confidentialité</a><br><a href="cgv.html" style="color:#65716b;text-decoration:underline">CGV</a><br><a href="cgu.html" style="color:#65716b;text-decoration:underline">CGU</a><br><a href="registre-traitements.html" style="color:#65716b;text-decoration:underline">Registre RGPD</a></p>
         </div>
         <div>
           <h4 style="margin-bottom:10px;color:#153e35;font-size:.88rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em">Navigation</h4>
@@ -1020,7 +1020,16 @@ var quizQuestions = [
       var valMsg = getEl('email-validation');
       if (valMsg) {
         var p = valMsg.querySelector('p');
-        if (p) p.innerHTML = 'Un email de validation vient d\'être envoyé à <strong>' + em.value.trim() + '</strong>.<br>Vérifiez votre boîte mail et saisissez le code reçu.';
+        if (p) {
+          // Email injecté via textContent (anti-XSS) : impossible d'interpréter du HTML.
+          p.textContent = 'Un email de validation vient d\'être envoyé à ';
+          var _strong = document.createElement('strong');
+          _strong.textContent = em.value.trim();
+          p.appendChild(_strong);
+          p.appendChild(document.createTextNode('.'));
+          p.appendChild(document.createElement('br'));
+          p.appendChild(document.createTextNode('Vérifiez votre boîte mail et saisissez le code reçu.'));
+        }
       }
     }
 
@@ -1470,14 +1479,41 @@ function switchAuthTab(t) {
   document.getElementById('clientErr').classList.remove('on');
 }
 
+// ── Vérification du mot de passe admin CÔTÉ SERVEUR (RPC admin_check) ──
+// Le serveur répond vrai/faux ; le mot de passe n'est plus la référence dans le
+// code. Filet de sécurité : si le serveur est injoignable (HORS LIGNE), repli sur
+// la vérification locale → l'accès admin n'est JAMAIS bloqué.
+function _adminCheck(pwd, cb) {
+  try {
+    fetch(SUPABASE_URL + '/rest/v1/rpc/admin_check', {
+      method: 'POST',
+      headers: Object.assign({}, sbHeaders(), { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ p_pwd: pwd })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('http ' + r.status);
+      return r.json();
+    }).then(function (res) {
+      cb(res === true, false);
+    }).catch(function () {
+      cb(false, true);   // SECURITE : acces admin REFUSE hors-ligne (fail-closed, plus de repli 826700)
+    });
+  } catch (e) {
+    cb(false, true);
+  }
+}
+
 // ── Login admin → redirige vers audit.html ──
 function loginAdmin() {
   var pwd = document.getElementById('adminPwd').value;
   var err = document.getElementById('adminErr');
   if (!pwd) { err.textContent='Veuillez saisir le mot de passe.'; err.classList.add('on'); return; }
-  if (pwd !== getAdminPwd()) { err.textContent='Mot de passe incorrect.'; err.classList.add('on'); document.getElementById('adminPwd').value=''; return; }
-  setSession({ role:'admin' });
-  window.location.href = 'audit.html';
+  err.classList.remove('on');
+  _adminCheck(pwd, function (ok) {
+    if (!ok) { err.textContent='Mot de passe incorrect.'; err.classList.add('on'); document.getElementById('adminPwd').value=''; return; }
+    try { sessionStorage.setItem('_adm_pwd', pwd); } catch (e) {}
+    setSession({ role:'admin' });
+    window.location.href = 'audit.html';
+  });
 }
 
 // ── Login client → redirige vers audit.html ──
@@ -1486,8 +1522,13 @@ function loginClient() {
   var err  = document.getElementById('clientErr');
   err.classList.remove('on');
   if (!code) { err.textContent='Veuillez saisir votre code d\'accès.'; err.classList.add('on'); return; }
-  fetchCodes_remote().then(function(remoteCodes) {
-    if (remoteCodes && remoteCodes.length > 0) saveCodes(remoteCodes);
+  fetchOneCode_remote(code).then(function(remoteCodes) {
+    if (remoteCodes && remoteCodes.length > 0) {
+      var local = getCodes();
+      var i = local.findIndex(function(c){ return c.code === remoteCodes[0].code; });
+      if (i >= 0) local[i] = remoteCodes[0]; else local.push(remoteCodes[0]);
+      saveCodes(local);
+    }
   }).catch(function(){}).finally(function() {
     var codes = getCodes();
     var found = codes.find(function(c){ return c.code === code; });
@@ -1497,7 +1538,7 @@ function loginClient() {
     found.used = true;
     found.usedAt = Date.now();
     saveCodes(codes);
-    updateCode_remote(code, { used: true }).catch(function(){});
+    consommer_code_remote(code).catch(function(){});
     setSession({ role:'client', code: code, client: found.client, info: found.info || {},
       docsUnlocked: found.docsUnlocked || found.type === 'full' || found.type === 'docs',
       docsOnly: found.type === 'docs', codeType: found.type || 'audit' });

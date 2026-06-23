@@ -7,7 +7,7 @@ var SESSION_KEY  = 'haccp_session';
 var CODES_KEY    = 'haccp_codes';
 var PWD_KEY      = 'haccp_adminpwd';
 var DEMANDES_KEY = 'haccp_demandes';
-var DEFAULT_ADMIN_PWD = '826700';
+var DEFAULT_ADMIN_PWD = '';  // SECURITE : plus de mot de passe public en clair (validation serveur via Vault)
 var DOC_AUTH_KEY = 'haccp_doc_auths';
 var ADMIN_EMAIL_KEY = 'haccp_admin_email';
 
@@ -77,9 +77,7 @@ function saveDemande_remote(demande) {
   }).then(function(r){ return r.json(); });
 }
 function fetchDemandes_remote() {
-  return fetch(SUPABASE_URL + '/rest/v1/demandes?order=id.desc', {
-    headers: sbHeaders()
-  }).then(function(r){ return r.json(); }).then(function(rows) {
+  return _rpc('admin_list_demandes', { p_pwd: _admPwd() }).then(function(rows) {
     if (!Array.isArray(rows)) return [];
     return rows.map(function(r) {
       return {
@@ -93,27 +91,12 @@ function fetchDemandes_remote() {
   });
 }
 function updateDemande_remote(id, statut, codeGenere) {
-  var body = { statut: statut };
-  if (codeGenere) body.code_genere = codeGenere;
-  return fetch(SUPABASE_URL + '/rest/v1/demandes?id=eq.' + id, {
-    method: 'PATCH',
-    headers: Object.assign({}, sbHeaders(), { 'Prefer': 'return=representation' }),
-    body: JSON.stringify(body)
-  }).then(function(r){ 
-    if (!r.ok) {
-      console.warn('Supabase update demande HTTP error:', r.status, r.statusText);
-      return null;
-    }
-    return r.json(); 
-  }).catch(function(e) {
-    console.warn('Supabase update demande network error:', e);
-    return null;
-  });
+  return _rpc('admin_update_demande', { p_pwd: _admPwd(), p_id: id, p_statut: statut, p_code: codeGenere || null })
+    .catch(function(e){ console.warn('update demande:', e); return null; });
 }
 function deleteDemande_remote(id) {
-  return fetch(SUPABASE_URL + '/rest/v1/demandes?id=eq.' + id, {
-    method: 'DELETE', headers: sbHeaders()
-  });
+  return _rpc('admin_delete_demande', { p_pwd: _admPwd(), p_id: id })
+    .catch(function(){ return null; });
 }
 
 // ══════════════════════════════════════════
@@ -125,59 +108,64 @@ function getCodes() {
 function saveCodes(c) {
   localStorage.setItem(CODES_KEY, JSON.stringify(c));
 }
-function saveCode_remote(codeObj) {
-  return fetch(SUPABASE_URL + '/rest/v1/codes', {
+// ── Appel d'une fonction serveur (RPC) Supabase ──
+function _rpc(name, body) {
+  return fetch(SUPABASE_URL + '/rest/v1/rpc/' + name, {
     method: 'POST',
-    headers: Object.assign({}, sbHeaders(), { 'Prefer': 'return=representation' }),
-    body: JSON.stringify({
-      code: codeObj.code, client: codeObj.client,
-      info: JSON.stringify(codeObj.info || {}),
-      type: codeObj.type || null, service_type: codeObj.serviceType || null,
-      docs_unlocked: codeObj.docsUnlocked || false,
-      exp: codeObj.exp || null, used: codeObj.used || false
-    })
-  }).then(function(r){ 
-    if (!r.ok) {
-      console.warn('Supabase save code HTTP error:', r.status, r.statusText);
-      return null;
-    }
-    return r.json(); 
-  }).catch(function(e) {
-    console.warn('Supabase save code network error:', e);
-    return null;
-  });
+    headers: Object.assign({}, sbHeaders(), { 'Content-Type': 'application/json' }),
+    body: JSON.stringify(body || {})
+  }).then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('http ' + r.status)); });
+}
+// Mot de passe admin de la session (mémorisé à la connexion admin), pour les
+// fonctions réservées à l'admin. Repli sur getAdminPwd() par sécurité.
+function _admPwd() {
+  try { return sessionStorage.getItem('_adm_pwd') || getAdminPwd(); } catch (e) { return getAdminPwd(); }
+}
+function _mapCodeRow(r) {
+  var info = {};
+  try { info = typeof r.info === 'string' ? JSON.parse(r.info) : (r.info || {}); } catch (e) {}
+  return {
+    code: r.code, client: r.client, info: info,
+    type: r.type, serviceType: r.service_type,
+    docsUnlocked: r.docs_unlocked, exp: r.exp,
+    used: r.used, created: r.created_at ? new Date(r.created_at).getTime() : Date.now()
+  };
+}
+// ── CODES via fonctions serveur sécurisées (plus d'accès direct à la table) ──
+function saveCode_remote(codeObj) {
+  return _rpc('admin_save_code', { p_pwd: _admPwd(), p_code: {
+    code: codeObj.code, client: codeObj.client,
+    info: JSON.stringify(codeObj.info || {}),
+    type: codeObj.type || null, service_type: codeObj.serviceType || null,
+    docs_unlocked: codeObj.docsUnlocked || false,
+    exp: codeObj.exp || null, used: codeObj.used || false
+  } }).catch(function (e) { console.warn('save code:', e); return null; });
 }
 function fetchCodes_remote() {
-  return fetch(SUPABASE_URL + '/rest/v1/codes?order=created_at.desc', {
-    headers: sbHeaders()
-  }).then(function(r){ return r.json(); }).then(function(rows) {
-    if (!Array.isArray(rows)) return [];
-    return rows.map(function(r) {
-      var info = {};
-      try { info = typeof r.info === 'string' ? JSON.parse(r.info) : (r.info || {}); } catch(e){}
-      return {
-        code: r.code, client: r.client, info: info,
-        type: r.type, serviceType: r.service_type,
-        docsUnlocked: r.docs_unlocked, exp: r.exp,
-        used: r.used, created: new Date(r.created_at).getTime()
-      };
-    });
+  return _rpc('admin_list_codes', { p_pwd: _admPwd() }).then(function (rows) {
+    return Array.isArray(rows) ? rows.map(_mapCodeRow) : [];
   });
 }
 function updateCode_remote(code, fields) {
-  var body = {};
-  if (fields.used !== undefined) body.used = fields.used;
-  if (fields.exp !== undefined) body.exp = fields.exp;
-  return fetch(SUPABASE_URL + '/rest/v1/codes?code=eq.' + code, {
-    method: 'PATCH',
-    headers: Object.assign({}, sbHeaders(), { 'Prefer': 'return=representation' }),
-    body: JSON.stringify(body)
-  }).then(function(r){ return r.json(); });
+  var patch = { code: code };
+  if (fields.used !== undefined) patch.used = fields.used;
+  if (fields.exp !== undefined) patch.exp = fields.exp;
+  if (fields.client !== undefined) patch.client = fields.client;
+  if (fields.info !== undefined) patch.info = (typeof fields.info === 'string') ? fields.info : JSON.stringify(fields.info);
+  return _rpc('admin_save_code', { p_pwd: _admPwd(), p_code: patch }).catch(function () { return null; });
 }
 function deleteCode_remote(code) {
-  return fetch(SUPABASE_URL + '/rest/v1/codes?code=eq.' + code, {
-    method: 'DELETE', headers: sbHeaders()
-  });
+  return _rpc('admin_delete_code', { p_pwd: _admPwd(), p_code: code }).catch(function () { return null; });
+}
+// Client : valide UN code (le sien) sans télécharger toute la liste.
+function fetchOneCode_remote(code) {
+  return _rpc('valider_code', { p_code: code }).then(function (row) {
+    return row ? [_mapCodeRow(row)] : [];
+  }).catch(function () { return []; });
+}
+// Client : marque son code comme utilisé.
+function consommer_code_remote(code) {
+  return _rpc('consommer_code', { p_code: code }).catch(function () { return null; });
 }
 
 // ── Synchronisation Supabase ──
@@ -379,3 +367,30 @@ function envoyerNotifAdmin(adminEmail, d) {
     console.warn('⚠️ Notif admin non envoyée:', err);
   });
 }
+
+
+/* ── BOUTON RETOUR UNIVERSEL — toujours visible, jamais cache (haut-gauche, z-index max) ── */
+(function(){
+  function _gbBack(){
+    try { if (typeof _fermerOverlayOuvert==="function" && _fermerOverlayOuvert()) { try{ history.pushState({},"",""); }catch(_){ } return; } } catch(e){}
+    try { var po=document.getElementById("printOverlay"); if(po&&po.parentNode){ po.parentNode.removeChild(po); return; } } catch(e){}
+    try { var nav=document.getElementById("navMobileMenu"); if(nav&&nav.classList.contains("open")){ nav.classList.remove("open"); return; } } catch(e){}
+    try { var m=document.querySelector(".modal-overlay.visible"); if(m){ m.classList.remove("visible"); return; } } catch(e){}
+    try { if (history.length>1){ history.back(); return; } } catch(e){}
+    try { var a=document.querySelector("a[href*=accueil]"); if(a&&a.getAttribute("href")){ location.href=a.getAttribute("href"); return; } } catch(e){}
+    try { location.href="index.html"; } catch(e){}
+  }
+  function _gbInject(){
+    try {
+      if (!document.body || document.getElementById("globalBackBtn")) return;
+      var b=document.createElement("button");
+      b.id="globalBackBtn"; b.type="button"; b.setAttribute("aria-label","Retour en arriere");
+      b.textContent="← Retour";
+      b.style.cssText="position:fixed;left:10px;top:10px;z-index:2147483600;background:rgba(15,23,42,.9);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:9px 14px;font-size:13px;font-weight:800;line-height:1;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.4);font-family:inherit;-webkit-tap-highlight-color:transparent";
+      b.onclick=_gbBack;
+      document.body.appendChild(b);
+    } catch(e){}
+  }
+  if (document.readyState!=="loading") _gbInject(); else document.addEventListener("DOMContentLoaded", _gbInject);
+  window.addEventListener("load", _gbInject);
+})();
